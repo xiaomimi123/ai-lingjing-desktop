@@ -810,7 +810,19 @@ ipcMain.handle('lingjing:channels-capabilities', async (_e, params) => {
 
 ipcMain.handle('lingjing:channels-add', async (_e, params) => {
   if (!params?.channel) return { ok: false, message: 'channel 必填' }
-  return channelsAdd(app.getPath('userData'), params.channel, params.options || {})
+  return channelsAdd(app.getPath('userData'), params.channel, params.options || {}, {
+    onLine: (line, source) => {
+      // 装缺失 dep 的过程也推给前端订阅者
+      for (const win of BrowserWindow.getAllWindows()) {
+        win.webContents.send('lingjing:channels-progress', {
+          stage: 'add',
+          channel: params.channel,
+          source,
+          line,
+        })
+      }
+    },
+  })
 })
 
 // 长任务：stdout/stderr 实时推到 'lingjing:channels-progress' 事件流。

@@ -345,6 +345,19 @@ function FormDialog({
   const [values, setValues] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [lastLine, setLastLine] = useState<string>('')
+
+  // 订阅 progress：装 dep / channels add 的实时输出
+  useEffect(() => {
+    if (!submitting) return
+    const unsub = ipc.channelsOnProgress((raw: unknown) => {
+      const p = raw as { stage: string; channel: string; line: string }
+      if (p.channel !== def.id) return
+      const trimmed = (p.line || '').trim()
+      if (trimmed) setLastLine(trimmed.slice(0, 120))
+    })
+    return () => unsub()
+  }, [submitting, def.id])
 
   const handleSubmit = async () => {
     setSubmitting(true)
@@ -400,12 +413,17 @@ function FormDialog({
               {error}
             </div>
           )}
+          {submitting && lastLine && (
+            <div className="rounded-md bg-muted/40 px-2 py-1.5 font-mono text-[10px] text-muted-foreground">
+              {lastLine}
+            </div>
+          )}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>取消</Button>
+          <Button variant="outline" onClick={onClose} disabled={submitting}>取消</Button>
           <Button onClick={handleSubmit} disabled={submitting}>
             {submitting && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
-            添加配置
+            {submitting ? '配置中…' : '添加配置'}
           </Button>
         </DialogFooter>
       </DialogContent>

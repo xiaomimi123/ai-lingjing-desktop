@@ -123,22 +123,107 @@ export async function getCapabilities(userDataPath, channelName) {
 }
 
 /**
+ * 装一个 npm 包到 OpenClaw 的 node_modules（OpenClaw extension 缺 dep 时用）。
+ * 自动找 openclaw 安装路径（bundled / brew / npm -g 都能 cover）。
+ */
+async function installOpenClawDep(userDataPath, pkg, onLine) {
+  // 找 openclaw root：从 bin 路径推
+  const candidates = openclawBinCandidates(userDataPath)
+  let openclawRoot = null
+  for (const c of candidates) {
+    try {
+      await fs.access(c)
+      // bundled: userData/runtime/openclaw/lib/node_modules/openclaw/
+      // brew: /opt/homebrew/lib/node_modules/openclaw/
+      // 不管哪个，bin 路径里都含 'lib/node_modules/openclaw'
+      const m = c.match(/^(.+\/lib\/node_modules\/openclaw)\//)
+      if (m) {
+        openclawRoot = m[1]
+        break
+      }
+    } catch { /* try next */ }
+  }
+  if (!openclawRoot) {
+    return { ok: false, message: '无法定位 OpenClaw 安装目录' }
+  }
+
+  onLine?.(`装 ${pkg} 到 ${openclawRoot}...`, 'stderr')
+
+  // 用 system npm（PATH 解析）
+  const npmBin = IS_WIN ? 'npm.cmd' : 'npm'
+  const args = ['install', '--no-save', '--registry=https://registry.npmmirror.com', pkg]
+  const env = {
+    ...process.env,
+    PATH: buildChildPath(userDataPath),
+    NO_UPDATE_NOTIFIER: '1',
+  }
+
+  return new Promise((resolve) => {
+    const proc = spawn(npmBin, args, {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env,
+      cwd: openclawRoot,
+      shell: IS_WIN,
+    })
+    let stdout = '', stderr = '', stdoutBuf = '', stderrBuf = ''
+    const consume = (buf, src) => {
+      let i
+      while ((i = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, i)
+        if (src === 'stdout') stdout += line + '\n'
+        else stderr += line + '\n'
+        onLine?.(line, src)
+        buf = buf.slice(i + 1)
+      }
+      return buf
+    }
+    proc.stdout.on('data', (d) => { stdoutBuf += d.toString(); stdoutBuf = consume(stdoutBuf, 'stdout') })
+    proc.stderr.on('data', (d) => { stderrBuf += d.toString(); stderrBuf = consume(stderrBuf, 'stderr') })
+    proc.on('error', (err) => resolve({ ok: false, message: String(err.message) }))
+    proc.on('close', (code) => {
+      if (stdoutBuf) onLine?.(stdoutBuf, 'stdout')
+      if (stderrBuf) onLine?.(stderrBuf, 'stderr')
+      resolve({ ok: code === 0, message: code === 0 ? `${pkg} 装好` : `npm install exit ${code}` })
+    })
+  })
+}
+
+/**
  * 添加一个 channel 配置。
  * options 是 add 参数 map，比如 { token: 'xxx', name: '主账号' }
  * 自动展开为 --key value 形式（带连字符）。
+ *
+ * 如果 OpenClaw extension 缺 npm dep（如 grammy / @slack/web-api），
+ * 自动 detect + 装 + 重试一次。
  */
-export async function addChannel(userDataPath, channelName, options = {}) {
-  const args = ['add', '--channel', channelName]
-  for (const [k, v] of Object.entries(options)) {
-    if (v === true) {
-      args.push(`--${k}`)
-    } else if (v === false || v == null || v === '') {
-      /* skip */
-    } else {
-      args.push(`--${k}`, String(v))
+export async function addChannel(userDataPath, channelName, options = {}, opts = {}) {
+  const { onLine } = opts
+  const buildArgs = () => {
+    const args = ['add', '--channel', channelName]
+    for (const [k, v] of Object.entries(options)) {
+      if (v === true) args.push(`--${k}`)
+      else if (v === false || v == null || v === '') { /* skip */ }
+      else args.push(`--${k}`, String(v))
     }
+    return args
   }
-  const r = await runChannelsCmd(userDataPath, args, { timeoutMs: 30000 })
+
+  let r = await runChannelsCmd(userDataPath, buildArgs(), { timeoutMs: 30000, onLine })
+
+  // 缺 npm dep（OpenClaw extension require 报 Cannot find module 'X'）
+  // → 自动装到 OpenClaw 目录 → 重试一次
+  const missingDep = (r.stderr || '').match(/Cannot find module '([^']+)'/)
+  if (missingDep && r.code !== 0) {
+    const pkg = missingDep[1]
+    onLine?.(`\n=== 检测到缺 npm 包 ${pkg}，自动安装中... ===`, 'stderr')
+    const installRes = await installOpenClawDep(userDataPath, pkg, onLine)
+    if (!installRes.ok) {
+      return { ok: false, message: `装 ${pkg} 失败：${installRes.message}` }
+    }
+    onLine?.(`\n=== ${pkg} 装好，重新尝试 channels add ===`, 'stderr')
+    r = await runChannelsCmd(userDataPath, buildArgs(), { timeoutMs: 30000, onLine })
+  }
+
   return r.code === 0
     ? { ok: true, message: '配置已添加', stdout: r.stdout.slice(-400) }
     : { ok: false, message: (r.stderr || r.stdout || `exit ${r.code}`).slice(-400) }
@@ -169,7 +254,8 @@ export async function logoutChannel(userDataPath, channelName, account) {
 }
 
 export async function removeChannel(userDataPath, channelName, account) {
-  const args = ['remove', '--channel', channelName]
+  // --delete 跳过交互式 Yes/No prompt（spawn 时没有 TTY 会卡死）
+  const args = ['remove', '--channel', channelName, '--delete']
   if (account) args.push('--account', account)
   const r = await runChannelsCmd(userDataPath, args, { timeoutMs: 15000 })
   return r.code === 0
