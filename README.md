@@ -14,7 +14,7 @@
 
 ---
 
-## ✨ 核心特性
+## ✨ 核心特性（v1.0）
 
 - **🪐 灵境主理人 Agent** — 默认装好的全能助手，能开网页 / 跑命令 / 操作文件，无需任何配置
 - **🇨🇳 国内镜像** — 技能商城默认走 `cn.clawhub-mirror.com`，告别 ClawHub 503 + 中文翻译
@@ -22,6 +22,18 @@
 - **⏰ 定时任务** — 5 个预设模板（整理下载 / 每周生成周报 / 清理 /tmp …）+ 可视化 cron 编辑器
 - **🎭 多 Agent 角色** — 内置文件管家 / 文档专家 / 数据分析师 / 写作助手 / 程序员 5 个预置 Agent，可在「我的 Agent」一键切换
 - **🔐 本地运行** — 数据全部在本机 SQLite + OpenClaw workspace，不上云
+
+## 🗺 v1.1 路线（开发中）
+
+正在做的下一阶段——**让小白用户下载即用**：
+
+- 🪟 **Windows 支持** — NSIS installer + portable exe，跟 macOS 一样跑
+- 📥 **首启自动装机** — 不要求用户手动装 Node / OpenClaw，应用第一次启动自动下载到用户目录
+  （走 npmmirror.com 国内镜像，Mac 实测 5 秒下完 Node + 2 分钟装 OpenClaw）
+- 🎨 **Onboarding UI** — 进度条 + 失败回退手动指南 + 跳过模式
+
+详细分阶段拆解见 [PLAN-PHASE-14-CROSS-PLATFORM.md](./PLAN-PHASE-14-CROSS-PLATFORM.md)。
+开发进度跟踪在 `react-v1.1-phase14.x` 系列 tag 上。
 
 ## 📦 安装
 
