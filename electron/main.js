@@ -2,9 +2,10 @@ import { app, BrowserWindow, Menu, ipcMain, dialog, net as electronNet, session,
 import path from 'node:path'
 import net from 'node:net'
 import os from 'node:os'
-import { promises as fs, accessSync, readdirSync } from 'node:fs'
+import { promises as fs, accessSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import { nodeBinCandidates, openclawBinCandidates, hermesBinCandidates, buildChildPath, IS_WIN } from './platform.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -26,16 +27,8 @@ let backendProcess = null
  * 所以优先 nvm v20.x;次选 brew Node(用户已装 Node 25,起来后会 ABI 不匹配 → 报错可见)。
  */
 function findNodeBin() {
-  const candidates = []
-  // nvm Node 20.x 全部子版本
-  try {
-    const nvmRoot = path.join(os.homedir(), '.nvm', 'versions', 'node')
-    const dirs = readdirSync(nvmRoot).filter((n) => n.startsWith('v20.'))
-    for (const d of dirs) candidates.push(path.join(nvmRoot, d, 'bin', 'node'))
-  } catch {
-    // 没装 nvm,继续
-  }
-  candidates.push('/opt/homebrew/bin/node', '/usr/local/bin/node', '/usr/bin/node')
+  // 跨平台候选见 electron/platform.js（bundled runtime 优先 → 系统 nvm/brew/winget）
+  const candidates = nodeBinCandidates(app.getPath('userData'))
   for (const c of candidates) {
     try {
       accessSync(c)
@@ -44,7 +37,7 @@ function findNodeBin() {
       // 跳到下一个
     }
   }
-  return 'node' // 寄望 PATH 能解到
+  return IS_WIN ? 'node.exe' : 'node' // 寄望 PATH 能解到
 }
 
 async function startBackend() {
@@ -110,11 +103,7 @@ async function ensureOpenClawRunning() {
   if (await pingTcpQuick('127.0.0.1', 18789)) {
     return { status: 'already-running', port: 18789 }
   }
-  const bin = await findBin([
-    '/opt/homebrew/bin/openclaw',
-    '/usr/local/bin/openclaw',
-    path.join(os.homedir(), '.local', 'bin', 'openclaw'),
-  ])
+  const bin = await findOpenClawBin()
   if (!bin) {
     return { status: 'skipped', message: 'openclaw CLI not installed' }
   }
@@ -142,11 +131,7 @@ async function ensureHermesRunning() {
   if (await pingTcpQuick('127.0.0.1', 8642)) {
     return { status: 'already-running', port: 8642 }
   }
-  const bin = await findBin([
-    path.join(os.homedir(), '.local', 'bin', 'hermes'),
-    '/opt/homebrew/bin/hermes',
-    '/usr/local/bin/hermes',
-  ])
+  const bin = await findBin(hermesBinCandidates())
   if (!bin) {
     return { status: 'skipped', message: 'hermes CLI not installed' }
   }
@@ -298,20 +283,13 @@ function createMainWindow() {
 // ============================================================================
 
 function runCommand(cmd, args, opts = {}) {
-  // 给子进程一个干净的 PATH,优先 brew 的 Node(>= v22.12,满足 OpenClaw 4.21
-  // 要求);Electron 自身跑在 nvm Node 20 上,直接继承会导致 openclaw 拒启动。
+  // 跨平台 PATH 拼接见 electron/platform.js（bundled runtime 优先）
+  // Win: 分号分隔 + node.exe / openclaw.cmd 在不同目录
+  // Mac/Linux: 冒号分隔 + brew/nvm/.local/bin
   const childEnv = {
     ...process.env,
     ...(opts.env || {}),
-    PATH: [
-      '/opt/homebrew/bin',       // brew node、openclaw、hermes 都在这
-      '/usr/local/bin',
-      '/usr/bin',
-      '/bin',
-      '/opt/homebrew/sbin',
-      `${os.homedir()}/.local/bin`, // hermes symlink
-      process.env.PATH || '',
-    ].filter(Boolean).join(':'),
+    PATH: buildChildPath(app.getPath('userData')),
   }
   return new Promise((resolve) => {
     const proc = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'], ...opts, env: childEnv })
@@ -325,22 +303,8 @@ function runCommand(cmd, args, opts = {}) {
 }
 
 async function configureOpenClaw(token, baseUrl, modelId, providerId = 'lingjing', compat = 'openai') {
-  // 找 openclaw CLI 路径(用户从 brew/npm 装在不同位置都覆盖到)
-  const candidates = [
-    '/opt/homebrew/bin/openclaw',
-    '/usr/local/bin/openclaw',
-    `${os.homedir()}/.local/bin/openclaw`,
-  ]
-  let bin = null
-  for (const c of candidates) {
-    try {
-      await fs.access(c)
-      bin = c
-      break
-    } catch {
-      // not found
-    }
-  }
+  // 复用 findOpenClawBin（跨平台候选）— 不要再写第二套硬编码
+  const bin = await findOpenClawBin()
   if (!bin) {
     return { status: 'skipped', message: 'openclaw CLI not found in common paths' }
   }
@@ -593,11 +557,8 @@ async function setClawHubUrl(url) {
 }
 
 async function findOpenClawBin() {
-  const candidates = [
-    '/opt/homebrew/bin/openclaw',
-    '/usr/local/bin/openclaw',
-    `${os.homedir()}/.local/bin/openclaw`,
-  ]
+  // 跨平台候选见 electron/platform.js
+  const candidates = openclawBinCandidates(app.getPath('userData'))
   for (const c of candidates) {
     try {
       await fs.access(c)

@@ -60,3 +60,18 @@
 - 出错时贴原始错误，不掩饰
 - 偶尔加一个 ✓ / ✗ 表示动作结果，不堆 emoji
 - 不卖萌，不自称"小灵"，正常自称"我"
+
+## 跨平台命令对照（Windows 用户必读）
+
+上面所有 exec 示例都是 macOS / Linux 的命令。**在 Windows 上请用以下等价命令**：
+
+| 意图 | macOS / Linux | Windows |
+|------|---------------|---------|
+| 打开网址 | `open https://www.douyin.com` | `start "" "https://www.douyin.com"` |
+| 打开应用 | `open -a WeChat` | `start "" "WeChat"` 或 PowerShell `Start-Process WeChat` |
+| 列目录 | `ls ~/Downloads` | `dir %USERPROFILE%\Downloads` |
+| 杀进程 | `pkill -x "Chrome"` | `taskkill /IM chrome.exe /F` |
+| 看进程列表 | `top -l 1 -n 5` | `tasklist` |
+| 截屏 | `screencapture ~/Desktop/x.png` | PowerShell snipping（暂无简单单行命令）|
+
+**判断平台**：开头检查环境变量 `OS=Windows_NT` 或路径里有 `C:\` 来识别。Windows 上不要用 `~` 表示 home，用 `%USERPROFILE%` 或绝对路径。
