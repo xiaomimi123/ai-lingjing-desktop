@@ -25,15 +25,20 @@
 
 ## 🗺 v1.1 路线（开发中）
 
-正在做的下一阶段——**让小白用户下载即用**：
+正在做的下一阶段——**让小白用户下载即用** + **接外部 IM 通信**：
 
 - 🪟 **Windows 支持** — NSIS installer + portable exe，跟 macOS 一样跑
 - 📥 **首启自动装机** — 不要求用户手动装 Node / OpenClaw，应用第一次启动自动下载到用户目录
   （走 npmmirror.com 国内镜像，Mac 实测 5 秒下完 Node + 2 分钟装 OpenClaw）
 - 🎨 **Onboarding UI** — 进度条 + 失败回退手动指南 + 跳过模式
+- 💬 **通信渠道**（Phase 15）— Agent 连 微信 / 飞书 / QQ / Telegram / Discord / Slack。
+  微信走腾讯官方 `@tencent-weixin/openclaw-weixin` plugin（扫码登录）✅ 已实测通
 
-详细分阶段拆解见 [PLAN-PHASE-14-CROSS-PLATFORM.md](./PLAN-PHASE-14-CROSS-PLATFORM.md)。
-开发进度跟踪在 `react-v1.1-phase14.x` 系列 tag 上。
+详细分阶段拆解：
+- [PLAN-PHASE-14-CROSS-PLATFORM.md](./PLAN-PHASE-14-CROSS-PLATFORM.md) — Win + 装机
+- [PLAN-PHASE-15-CHANNELS.md](./PLAN-PHASE-15-CHANNELS.md) — 6 个 IM 通信渠道
+
+开发进度跟踪在 `react-v1.1-phase14.x` / `react-v1.1-phase15.x` 系列 tag 上。
 
 ## 📦 安装
 
