@@ -5,6 +5,7 @@
   "version": "1.0.0",
   "license": "Apache-2.0",
   "description": "灵境桌面 — Mac 上的 AI Agent 行动平台，让 AI 真正能操作你的电脑。基于 OpenClaw + Electron + React。",
+  "author": "lizhishaoniange",
   "homepage": "https://github.com/xiaomimi123/ai-lingjing-desktop",
   "repository": {
     "type": "git",
@@ -35,6 +36,8 @@
     "electron:dev": "concurrently -k -n \"frontend,electron\" -c \"blue,magenta\" \"vite\" \"wait-on tcp:3001 && electron .\"",
     "electron:build": "tsc -b && vite build",
     "dist:mac": "npm run electron:build && electron-builder --mac && npm rebuild better-sqlite3",
+    "dist:win": "npm run electron:build && electron-builder --win && npm rebuild better-sqlite3",
+    "dist:win:dryrun": "npm run electron:build && electron-builder --win --dir",
     "test:e2e": "node --env-file-if-exists=.env.test ./node_modules/.bin/playwright test",
     "test:e2e:headed": "node --env-file-if-exists=.env.test ./node_modules/.bin/playwright test --headed",
     "test:e2e:ui": "node --env-file-if-exists=.env.test ./node_modules/.bin/playwright test --ui",
@@ -81,6 +84,31 @@
     },
     "dmg": {
       "title": "灵境"
+    },
+    "win": {
+      "executableName": "lingjing",
+      "icon": "public/lingjing.png",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": false,
+      "shortcutName": "灵境",
+      "uninstallDisplayName": "灵境 ${version}"
+    },
+    "portable": {
+      "artifactName": "灵境-${version}-portable.exe"
     }
   },
   "dependencies": {
