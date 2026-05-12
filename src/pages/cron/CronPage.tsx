@@ -351,7 +351,6 @@ function AddJobDialog({
                 data-preset-id={p.id}
                 title={p.description}
               >
-                <span>{p.emoji}</span>
                 <span>{p.name}</span>
               </button>
             ))}

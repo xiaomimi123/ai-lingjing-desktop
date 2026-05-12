@@ -4,6 +4,7 @@ import { Download, Loader2, CheckCircle2 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { getAgentIcon } from '@/lib/agent-icons'
 import type { MarketAgent } from '@/services/agents-api'
 
 interface MarketAgentCardProps {
@@ -14,6 +15,7 @@ interface MarketAgentCardProps {
 
 export function MarketAgentCard({ agent, installing, onInstall }: MarketAgentCardProps) {
   const installed = agent.installed
+  const Icon = getAgentIcon(agent.id)
   return (
     <Card
       data-testid="market-agent-card"
@@ -22,8 +24,8 @@ export function MarketAgentCard({ agent, installing, onInstall }: MarketAgentCar
       className={cn('flex flex-col gap-3 p-4', installed && 'opacity-80')}
     >
       <div className="flex items-start gap-3">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border bg-muted text-2xl">
-          {agent.emoji ?? '🤖'}
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border bg-muted text-muted-foreground">
+          <Icon className="h-6 w-6" strokeWidth={1.5} />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">

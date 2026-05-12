@@ -18,6 +18,13 @@ import {
   ExternalLink,
   Globe2,
   Copy,
+  MessageCircle,
+  Building2,
+  MessagesSquare,
+  Send,
+  Gamepad2,
+  Hash,
+  type LucideIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -32,7 +39,7 @@ type ConnectMethod = 'plugin+qrcode' | 'oauth-login' | 'bot-token' | 'bot-app-to
 interface ChannelDef {
   id: string          // openclaw --channel 取值（微信特殊用 'weixin'）
   name: string
-  emoji: string
+  icon: LucideIcon    // 替代之前的 emoji 字段
   region: 'cn' | 'intl'
   method: ConnectMethod
   description: string
@@ -46,7 +53,7 @@ const CHANNEL_DEFS: ChannelDef[] = [
   {
     id: 'weixin',
     name: '微信',
-    emoji: '💬',
+    icon: MessageCircle,
     region: 'cn',
     method: 'plugin+qrcode',
     description: '通过腾讯官方 plugin @tencent-weixin/openclaw-weixin 接入。扫码登录。',
@@ -54,7 +61,7 @@ const CHANNEL_DEFS: ChannelDef[] = [
   {
     id: 'feishu',
     name: '飞书',
-    emoji: '📱',
+    icon: Building2,
     region: 'cn',
     method: 'oauth-login',
     description: 'OpenClaw 原生支持。点连接后用 Lark / 飞书 app 扫码登录（类似微信流程）。',
@@ -62,7 +69,7 @@ const CHANNEL_DEFS: ChannelDef[] = [
   {
     id: 'qqbot',
     name: 'QQ Bot',
-    emoji: '🐧',
+    icon: MessagesSquare,
     region: 'cn',
     method: 'bot-token',
     description: '在 q.qq.com 申请 QQ 频道机器人。token 格式：appId:clientSecret（用冒号拼）。',
@@ -79,7 +86,7 @@ const CHANNEL_DEFS: ChannelDef[] = [
   {
     id: 'telegram',
     name: 'Telegram',
-    emoji: '✈️',
+    icon: Send,
     region: 'intl',
     method: 'bot-token',
     description: '需要梯子。OpenClaw 原生。@BotFather 申请 bot token。',
@@ -92,7 +99,7 @@ const CHANNEL_DEFS: ChannelDef[] = [
   {
     id: 'discord',
     name: 'Discord',
-    emoji: '🎮',
+    icon: Gamepad2,
     region: 'intl',
     method: 'bot-token',
     description: '需要梯子。在 discord.com/developers/applications 创建 bot 拿 token。',
@@ -105,7 +112,7 @@ const CHANNEL_DEFS: ChannelDef[] = [
   {
     id: 'slack',
     name: 'Slack',
-    emoji: '#️⃣',
+    icon: Hash,
     region: 'intl',
     method: 'bot-app-token',
     description: '需要 Slack workspace 管理员权限。要 bot token (xoxb-) 和 app token (xapp-)。',
@@ -235,7 +242,7 @@ export function ChannelsPage() {
 
         {/* 国内 */}
         <div>
-          <h2 className="mb-2 text-sm font-semibold text-muted-foreground">🇨🇳 国内常用</h2>
+          <h2 className="mb-2 text-sm font-semibold text-muted-foreground">国内常用</h2>
           <div className="grid gap-3 sm:grid-cols-3">
             {cnChannels.map((def) => {
               // 微信特殊：def.id='weixin' 但 status 里 channel id='openclaw-weixin'
@@ -341,7 +348,9 @@ function ChannelCard({
   return (
     <Card className="flex flex-col gap-2 p-3 text-xs" data-channel-id={def.id}>
       <div className="flex items-start gap-2">
-        <div className="text-2xl leading-none">{def.emoji}</div>
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border bg-muted text-muted-foreground">
+          <def.icon className="h-5 w-5" strokeWidth={1.5} />
+        </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1 font-medium">
             {def.name}
@@ -460,7 +469,7 @@ function FormDialog({
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{def.emoji} 配置 {def.name}</DialogTitle>
+          <DialogTitle className="flex items-center gap-2"><def.icon className="h-4 w-4" strokeWidth={1.5} /> 配置 {def.name}</DialogTitle>
           <DialogDescription>{def.description}</DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
@@ -594,7 +603,7 @@ function ProgressDialog({
     <Dialog open onOpenChange={(o) => !o && stage !== 'logging-in' && onClose()}>
       <DialogContent className="max-w-4xl">
         <DialogHeader>
-          <DialogTitle>{def.emoji} 连接 {def.name}</DialogTitle>
+          <DialogTitle className="flex items-center gap-2"><def.icon className="h-4 w-4" strokeWidth={1.5} /> 连接 {def.name}</DialogTitle>
           <DialogDescription>
             {stage === 'failed' ? (
               <span className="text-destructive">{stageLabel}</span>
@@ -607,7 +616,7 @@ function ProgressDialog({
         <div className="space-y-2">
           {(def.method === 'plugin+qrcode' || def.method === 'oauth-login') && (
             <div className="rounded-md border border-blue-200 bg-blue-50 p-2 text-[11px] text-blue-800 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-200">
-              📱 看到二维码（密集的 ██ 方块）后，用对应 app 扫一扫：
+              看到二维码（密集的 ██ 方块）后，用对应 app 扫一扫：
               <span className="font-medium">
                 {def.id === 'weixin' ? '微信「扫一扫」' : def.id === 'feishu' ? '飞书 / Lark 扫一扫' : '对应 app 扫一扫'}
               </span>

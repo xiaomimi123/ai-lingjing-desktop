@@ -3,7 +3,6 @@
 export interface CronPreset {
   id: string
   name: string
-  emoji: string
   description: string
   schedule: string
   message: string
@@ -13,7 +12,6 @@ export const CRON_PRESETS: CronPreset[] = [
   {
     id: 'tidy-downloads-daily',
     name: '每日整理下载',
-    emoji: '📁',
     description: '每天上午 9 点把 ~/Downloads 下的文件按类型归档到子目录',
     schedule: '0 9 * * *',
     message:
@@ -22,7 +20,6 @@ export const CRON_PRESETS: CronPreset[] = [
   {
     id: 'weekly-summary-friday',
     name: '每周五生成周报',
-    emoji: '📅',
     description: '每周五下午 5 点根据 git commit 和本周聊天记录生成周报',
     schedule: '0 17 * * 5',
     message:
@@ -31,7 +28,6 @@ export const CRON_PRESETS: CronPreset[] = [
   {
     id: 'cleanup-tmp-hourly',
     name: '每小时清理 /tmp',
-    emoji: '🧹',
     description: '每小时检查 /tmp 下超过 7 天没动的文件并清理',
     schedule: '0 * * * *',
     message:
@@ -40,7 +36,6 @@ export const CRON_PRESETS: CronPreset[] = [
   {
     id: 'check-tasks-30m',
     name: '每 30 分钟检查任务',
-    emoji: '🔍',
     description: '每 30 分钟扫描 ~/.openclaw/agents/main 下的 TODO.md 并提醒',
     schedule: '*/30 * * * *',
     message:
@@ -49,7 +44,6 @@ export const CRON_PRESETS: CronPreset[] = [
   {
     id: 'backup-config-midnight',
     name: '每天凌晨备份 .env',
-    emoji: '💾',
     description: '每天 0 点把 .env、~/.openclaw/openclaw.json 备份到 ~/backups',
     schedule: '0 0 * * *',
     message:

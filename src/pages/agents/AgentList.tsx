@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { RefreshCw, ShieldCheck, ShieldAlert, Sparkles, Package, Trash2 } from 'lucide-react'
+import { getAgentIcon } from '@/lib/agent-icons'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Button } from '@/components/ui/button'
@@ -236,7 +237,10 @@ export function AgentList() {
             <>
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
-                  <span className="text-2xl">{detail.emoji ?? '🤖'}</span>
+                  {(() => {
+                    const Icon = getAgentIcon(detail.id)
+                    return <Icon className="h-5 w-5 text-muted-foreground" strokeWidth={1.5} />
+                  })()}
                   {detail.name}
                 </DialogTitle>
                 <DialogDescription>{detail.description}</DialogDescription>

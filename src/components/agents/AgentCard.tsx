@@ -4,6 +4,7 @@ import { CheckCircle2, Loader2 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { getAgentIcon } from '@/lib/agent-icons'
 import type { AgentSummary } from '@/services/agents-api'
 
 interface AgentCardProps {
@@ -15,6 +16,7 @@ interface AgentCardProps {
 }
 
 export function AgentCard({ agent, active, activating, onActivate, onViewDetail }: AgentCardProps) {
+  const Icon = getAgentIcon(agent.id)
   return (
     <Card
       data-testid="agent-card"
@@ -26,8 +28,8 @@ export function AgentCard({ agent, active, activating, onActivate, onViewDetail 
       )}
     >
       <div className="flex items-start gap-3">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border bg-muted text-2xl">
-          {agent.emoji ?? '🤖'}
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border bg-muted text-muted-foreground">
+          <Icon className="h-6 w-6" strokeWidth={1.5} />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
