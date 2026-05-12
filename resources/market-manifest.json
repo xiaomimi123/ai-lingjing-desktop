@@ -1,0 +1,73 @@
+{
+  "version": 1,
+  "updatedAt": "2026-05-11",
+  "source": "灵境官方市场（本地内置目录）",
+  "agents": [
+    {
+      "id": "translator",
+      "name": "翻译助手",
+      "emoji": "🌐",
+      "description": "中英互译，保留语气、上下文、文化语境；多版本输出（直译/意译/创译）",
+      "soulPath": "resources/market-agents/translator.md",
+      "author": "灵境官方",
+      "version": "1.0.0",
+      "tags": ["语言", "写作"],
+      "downloads": 0
+    },
+    {
+      "id": "daily-summary",
+      "name": "日报助手",
+      "emoji": "📅",
+      "description": "从素材生成日报/周报/Standup，数字优先，去过程留结果",
+      "soulPath": "resources/market-agents/daily-summary.md",
+      "author": "灵境官方",
+      "version": "1.0.0",
+      "tags": ["效率", "写作"],
+      "downloads": 0
+    },
+    {
+      "id": "meeting-notes",
+      "name": "会议纪要助手",
+      "emoji": "🗒️",
+      "description": "从转写或聊天记录提炼议题、决议、Action Items，自动脱敏",
+      "soulPath": "resources/market-agents/meeting-notes.md",
+      "author": "灵境官方",
+      "version": "1.0.0",
+      "tags": ["效率", "写作"],
+      "downloads": 0
+    },
+    {
+      "id": "mail-helper",
+      "name": "邮件代办",
+      "emoji": "📧",
+      "description": "起草、回复、拒绝、跟进、道歉；中英双语商务/私人切换",
+      "soulPath": "resources/market-agents/mail-helper.md",
+      "author": "灵境官方",
+      "version": "1.0.0",
+      "tags": ["写作", "效率"],
+      "downloads": 0
+    },
+    {
+      "id": "screenshot-cleaner",
+      "name": "截图清理",
+      "emoji": "🖼️",
+      "description": "OCR 识别 + 去重 + 按内容/时间归档 + 隐私敏感警告",
+      "soulPath": "resources/market-agents/screenshot-cleaner.md",
+      "author": "灵境官方",
+      "version": "1.0.0",
+      "tags": ["文件", "效率"],
+      "downloads": 0
+    },
+    {
+      "id": "repo-explainer",
+      "name": "代码库讲解员",
+      "emoji": "📖",
+      "description": "5 分钟读懂陌生项目：技术栈、入口、目录、运行步骤、架构图",
+      "soulPath": "resources/market-agents/repo-explainer.md",
+      "author": "灵境官方",
+      "version": "1.0.0",
+      "tags": ["代码", "学习"],
+      "downloads": 0
+    }
+  ]
+}
