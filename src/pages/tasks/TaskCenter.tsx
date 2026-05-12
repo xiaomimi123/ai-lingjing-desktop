@@ -3,7 +3,7 @@
 
 import { useCallback, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ListChecks, Sparkles, Trash2, AlertTriangle, Inbox, CheckCircle2, XCircle, Loader2 } from 'lucide-react'
+import { ListChecks, Sparkles, Trash2, AlertTriangle, Inbox, CheckCircle2, XCircle, Loader2 } from '@/lib/icons'
 import { Button } from '@/components/ui/button'
 import { TaskTemplateCard } from '@/components/tasks/TaskTemplateCard'
 import { TemplateParamsDialog } from '@/components/tasks/TemplateParamsDialog'

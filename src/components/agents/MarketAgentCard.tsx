@@ -1,6 +1,6 @@
 // 市场 Agent 卡片。安装按钮 + 作者/版本/tags。
 
-import { Download, Loader2, CheckCircle2 } from 'lucide-react'
+import { Download, Loader2, CheckCircle2 } from '@/lib/icons'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'

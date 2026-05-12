@@ -63,7 +63,7 @@ export default defineConfig(({ mode }) => {
               if (id.includes('framer-motion')) return 'framer-motion'
               if (id.includes('katex') || id.includes('markdown-it') || id.includes('highlight.js')) return 'tex-md'
               if (id.includes('axios')) return 'axios'
-              if (id.includes('lucide-react')) return 'icons'
+              if (id.includes('iconoir-react')) return 'icons'
               if (id.includes('i18next')) return 'i18n'
               if (id.includes('zustand')) return 'zustand'
               if (id.includes('react-router')) return 'react-router'

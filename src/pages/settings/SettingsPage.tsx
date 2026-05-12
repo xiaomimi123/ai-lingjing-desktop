@@ -7,7 +7,7 @@
 // 暂不内置编辑器（schema 未公开，避免误写破坏 OpenClaw）。
 
 import { useCallback, useEffect, useState } from 'react'
-import { ExternalLink, FolderOpen, LogOut, RefreshCw, ShieldAlert, ShieldCheck } from 'lucide-react'
+import { ExternalLink, FolderOpen, LogOut, RefreshCw, ShieldAlert, ShieldCheck } from '@/lib/icons'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
@@ -22,7 +22,7 @@ import {
   VerticalTabsTrigger,
   VerticalTabsContent,
 } from '@/components/ui/tabs-vertical'
-import { SlidersHorizontal, Hexagon, Info, ShieldAlert as ShieldAlertIcon } from 'lucide-react'
+import { SlidersHorizontal, Hexagon, Info, ShieldAlert as ShieldAlertIcon } from '@/lib/icons'
 
 const APPROVALS_PATH = '~/.openclaw/exec-approvals.json'
 const OPENCLAW_DOCS_URL = 'https://github.com/openclaw/openclaw'

@@ -1,7 +1,7 @@
 // 任务执行过程面板：顶部信息 + 步骤时间线 + 底部最终回复。
 
 import { useEffect, useRef } from 'react'
-import { Loader2, Square, Bot } from 'lucide-react'
+import { Loader2, Square, Bot } from '@/lib/icons'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Button } from '@/components/ui/button'

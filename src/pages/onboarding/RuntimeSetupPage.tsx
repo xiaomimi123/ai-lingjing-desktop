@@ -5,7 +5,7 @@
 // 调用链：App.tsx 启动 gate → 用 ipc.runtimeStatus() 判 needsSetup → 显示这页。
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { CheckCircle2, Cloud, Download, Loader2, Package, AlertTriangle, ExternalLink, Copy } from 'lucide-react'
+import { CheckCircle2, Cloud, Download, Loader2, Package, AlertTriangle, ExternalLink, Copy } from '@/lib/icons'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ipc } from '@/services/ipc'

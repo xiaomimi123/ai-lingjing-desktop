@@ -2,7 +2,7 @@
 // 新建按钮调 spawnSession 创建新会话。
 
 import { useCallback, useEffect, useState } from 'react'
-import { MoreVertical, Plus, RefreshCw, Trash2, RotateCcw } from 'lucide-react'
+import { MoreVertical, Plus, RefreshCw, Trash2, RotateCcw } from '@/lib/icons'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {

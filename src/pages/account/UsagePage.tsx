@@ -2,7 +2,7 @@
 // 灵境云端有详细用量 API（/api/log/self、/api/log/usage 等），Phase 6.1+ 再接。
 
 import { Link } from 'react-router-dom'
-import { ArrowLeft, ExternalLink } from 'lucide-react'
+import { ArrowLeft, ExternalLink } from '@/lib/icons'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ipc } from '@/services/ipc'

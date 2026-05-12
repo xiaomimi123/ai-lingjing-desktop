@@ -1,7 +1,7 @@
 // /agents 页面：Tabs 切换 已安装 / 发现 + SOUL.md 详情 Dialog。
 
 import { useCallback, useEffect, useState } from 'react'
-import { RefreshCw, ShieldCheck, ShieldAlert, Sparkles, Package, Trash2 } from 'lucide-react'
+import { RefreshCw, ShieldCheck, ShieldAlert, Sparkles, Package, Trash2 } from '@/lib/icons'
 import { getAgentIcon } from '@/lib/agent-icons'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'

@@ -1,6 +1,6 @@
 // 任务模板卡。点击 → 打开 ParamsDialog 填参数 → 触发执行。
 
-import { ShieldCheck, ShieldAlert, ShieldX } from 'lucide-react'
+import { ShieldCheck, ShieldAlert, ShieldX } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 import {
   type TaskTemplate,
