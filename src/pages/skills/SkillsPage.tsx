@@ -160,29 +160,34 @@ export function SkillsPage() {
   return (
     <div className="h-full overflow-auto">
       <div className="mx-auto max-w-5xl space-y-4 p-6">
-        <div className="flex items-start justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold">技能商城</h1>
-            <p className="text-sm text-muted-foreground">
-              OpenClaw skills 是给 Agent 装的「工具包」（CLI、配置模板、说明）。与 Agent 市场不同：
-              skills 扩展能力，Agent 是人格。
-            </p>
-          </div>
-          <Button size="sm" variant="outline" onClick={reload} disabled={loading}>
-            <RefreshCw className={cn('mr-1 h-3.5 w-3.5', loading && 'animate-spin')} />
-            刷新
-          </Button>
+        <div>
+          <h1 className="text-lg font-semibold">技能商城</h1>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            给 Agent 装的「工具包」(CLI / 配置 / 文档)。与 Agent 市场不同 — skills 扩展能力，Agent 是人格。
+          </p>
         </div>
 
-        {/* Tabs */}
-        <div className="flex items-center gap-1 border-b">
-          <TabButton active={tab === 'installed'} onClick={() => setTab('installed')} testid="tab-installed">
-            <Package className="h-3.5 w-3.5" /> 已安装
-            <Badge>{skills.filter((s) => !s.bundled).length}+{skills.filter((s) => s.bundled).length}</Badge>
-          </TabButton>
-          <TabButton active={tab === 'market'} onClick={() => setTab('market')} testid="tab-market">
-            <Search className="h-3.5 w-3.5" /> 商店（ClawHub）
-          </TabButton>
+        {/* Tabs + 右侧刷新 */}
+        <div className="flex items-center justify-between border-b">
+          <div className="flex items-center gap-1">
+            <TabButton active={tab === 'installed'} onClick={() => setTab('installed')} testid="tab-installed">
+              <Package className="h-3.5 w-3.5" strokeWidth={1.5} /> 已安装
+              <Badge>{skills.filter((s) => !s.bundled).length}+{skills.filter((s) => s.bundled).length}</Badge>
+            </TabButton>
+            <TabButton active={tab === 'market'} onClick={() => setTab('market')} testid="tab-market">
+              <Search className="h-3.5 w-3.5" strokeWidth={1.5} /> 商店
+            </TabButton>
+          </div>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="mb-1 h-7 w-7 text-muted-foreground"
+            onClick={reload}
+            disabled={loading}
+            title="刷新"
+          >
+            <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin')} />
+          </Button>
         </div>
 
         {(error || toast) && (
@@ -218,17 +223,23 @@ export function SkillsPage() {
 
         {tab === 'market' && (
           <div className="space-y-3">
-            <div className="flex gap-2">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" strokeWidth={1.5} />
               <Input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                placeholder="搜索 skill 名或关键字（留空显示推荐）"
-                className="flex-1"
+                placeholder="搜索 skill 名或关键字（Enter 搜索，留空显示推荐）"
+                className="pl-9 pr-20"
                 data-testid="skills-search"
               />
-              <Button onClick={handleSearch} disabled={marketLoading}>
-                {marketLoading ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Search className="mr-1 h-3.5 w-3.5" />}
+              <Button
+                onClick={handleSearch}
+                disabled={marketLoading}
+                size="sm"
+                className="absolute right-1 top-1/2 h-7 -translate-y-1/2"
+              >
+                {marketLoading && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
                 搜索
               </Button>
             </div>
@@ -346,13 +357,15 @@ function SkillCard({
       className={cn('flex flex-col gap-2 p-3 text-xs', isDisabled && 'opacity-60')}
     >
       <div className="flex items-start gap-2">
-        <div className="text-xl leading-none">{skill.emoji ?? '🧩'}</div>
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border bg-muted text-muted-foreground">
+          <Package className="h-4 w-4" strokeWidth={1.5} />
+        </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
-            <span className="font-medium">{skill.name}</span>
-            <StatusIcon className={cn('h-3.5 w-3.5', statusColor)} />
+            <span className="truncate font-medium">{skill.name}</span>
+            <StatusIcon className={cn('h-3.5 w-3.5 shrink-0', statusColor)} />
             {skill.bundled && (
-              <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+              <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
                 bundled
               </span>
             )}
@@ -454,15 +467,17 @@ function MarketSkillCard({
   return (
     <Card className="flex flex-col gap-2 p-3 text-xs">
       <div className="flex items-start gap-2">
-        <div className="text-xl leading-none">{(item.emoji as string) ?? '🧩'}</div>
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border bg-muted text-muted-foreground">
+          <Package className="h-4 w-4" strokeWidth={1.5} />
+        </div>
         <div className="min-w-0 flex-1">
-          <div className="font-medium">{(item.name as string) ?? item.slug}</div>
-          {item.slug && <div className="font-mono text-[10px] text-muted-foreground">{item.slug as string}</div>}
+          <div className="truncate font-medium">{(item.name as string) ?? item.slug}</div>
+          {item.slug && <div className="truncate font-mono text-[10px] text-muted-foreground">{item.slug as string}</div>}
           {rawDesc && (
             <div className="mt-1 line-clamp-3 text-muted-foreground">{rawDesc}</div>
           )}
           {showCn && (
-            <div className="mt-1 line-clamp-2 text-foreground/80">🇨🇳 {cnDesc}</div>
+            <div className="mt-1 line-clamp-2 text-foreground/80">{cnDesc}</div>
           )}
         </div>
       </div>
