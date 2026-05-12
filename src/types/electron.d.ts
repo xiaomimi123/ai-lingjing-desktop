@@ -106,6 +106,8 @@ export interface LingjingPreload {
     targetNodeVersion: string
     node: { ready: boolean; version?: string; path?: string; reason?: string; error?: string }
     openclaw: { ready: boolean; version?: string; path?: string; reason?: string; error?: string }
+    system: { nodePath: string | null; openclawPath: string | null; detected: boolean }
+    needsSetup: boolean
     runtimeRoot: string
   }>
   runtimeEnsureNode(): Promise<{

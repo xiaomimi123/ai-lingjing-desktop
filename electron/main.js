@@ -28,8 +28,14 @@ let backendProcess = null
  * 所以优先 nvm v20.x;次选 brew Node(用户已装 Node 25,起来后会 ABI 不匹配 → 报错可见)。
  */
 function findNodeBin() {
-  // 跨平台候选见 electron/platform.js（bundled runtime 优先 → 系统 nvm/brew/winget）
-  const candidates = nodeBinCandidates(app.getPath('userData'))
+  // 跨平台候选见 electron/platform.js
+  // 生产模式：bundled 优先（保证小白用户能跑）
+  // 开发模式：跳 bundled —— bundled v22 跟 dev native module（按 system v20 编译）ABI 不匹配
+  //         dev 用 system node，packaged 才用 bundled
+  const all = nodeBinCandidates(app.getPath('userData'))
+  const candidates = isDev
+    ? all.filter((c) => !c.includes(path.join('runtime', 'node')))
+    : all
   for (const c of candidates) {
     try {
       accessSync(c)
@@ -688,15 +694,33 @@ ipcMain.handle('lingjing:clawhub-ping', async (_event, params) => {
 
 ipcMain.handle('lingjing:runtime-status', async () => {
   const userData = app.getPath('userData')
-  const [node, openclaw] = await Promise.all([
+  const [bundledNode, bundledOpenclaw, systemNodeBin, systemOpenclawBin] = await Promise.all([
     isBundledNodeReady(userData),
     isBundledOpenClawReady(userData),
+    findNodeBin(),                  // 跨平台 candidates，含 bundled — 第一个能用的就返回
+    findOpenClawBin(),              // 同上
   ])
+
+  // 关键判断：onboarding 是否还要弹？
+  // - bundled 装好 → 不弹
+  // - 系统装了 Node v22+ 且 openclaw 也在 → 不弹（用系统的，省 800MB 磁盘）
+  // - 否则要弹
+  const hasRuntime = bundledNode.ready && bundledOpenclaw.ready
+  // 系统侧粗判：findOpenClawBin 返回非 null（可能是 bundled，也可能是 brew/winget）
+  // 并不验证 node 版本是否 v22+，因为 openclaw 自己会拒启动 — 真要拒就 onboarding 会触发
+  const systemDetected = !!systemOpenclawBin && systemOpenclawBin !== bundledOpenclaw.path
+
   return {
     ok: true,
     targetNodeVersion: NODE_VERSION,
-    node,
-    openclaw,
+    node: bundledNode,
+    openclaw: bundledOpenclaw,
+    system: {
+      nodePath: systemNodeBin,
+      openclawPath: systemOpenclawBin,
+      detected: systemDetected,
+    },
+    needsSetup: !hasRuntime && !systemDetected,
     runtimeRoot: path.join(userData, 'runtime'),
   }
 })
