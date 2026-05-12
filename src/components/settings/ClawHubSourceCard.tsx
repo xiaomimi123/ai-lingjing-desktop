@@ -10,7 +10,7 @@
 // 重读 OPENCLAW_CLAWHUB_URL env，不需要重启。
 
 import { useCallback, useEffect, useState } from 'react'
-import { Cloud, Gauge, Globe2, Pencil, Loader2 } from 'lucide-react'
+import { Cloud, Gauge, Globe2, Pencil, Loader2 } from '@/lib/icons'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'

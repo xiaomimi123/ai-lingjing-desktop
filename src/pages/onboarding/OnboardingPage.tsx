@@ -4,7 +4,7 @@
 import { useCallback, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Bot, CheckCircle2, ChevronRight, KeyRound, Loader2, Mail, Rocket, ShieldCheck, Sparkles } from 'lucide-react'
+import { Bot, CheckCircle2, ChevronRight, KeyRound, Loader2, Mail, Rocket, ShieldCheck, Sparkles } from '@/lib/icons'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useLingjingAuthStore } from '@/stores/lingjing-auth-store'

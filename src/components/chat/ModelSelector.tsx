@@ -5,7 +5,7 @@
 // 暂用 DropdownMenu。后续可以扩展为带搜索的 Command 面板（Ctrl+K）。
 
 import { useCallback, useEffect, useState } from 'react'
-import { Check, Cpu, ChevronDown } from 'lucide-react'
+import { Check, Cpu, ChevronDown } from '@/lib/icons'
 import {
   DropdownMenu,
   DropdownMenuContent,

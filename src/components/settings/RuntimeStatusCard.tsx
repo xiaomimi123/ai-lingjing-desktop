@@ -2,7 +2,7 @@
 // 已装秒进主界面看不到 onboarding；这里给一个常驻入口看状态 + 触发重装看 UI。
 
 import { useCallback, useEffect, useState } from 'react'
-import { CheckCircle2, XCircle, RefreshCw, FolderOpen, Trash2, Cpu, AlertTriangle, Loader2 } from 'lucide-react'
+import { CheckCircle2, XCircle, RefreshCw, FolderOpen, Trash2, Cpu, AlertTriangle, Loader2 } from '@/lib/icons'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ipc } from '@/services/ipc'

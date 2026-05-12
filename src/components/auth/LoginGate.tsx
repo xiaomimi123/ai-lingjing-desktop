@@ -3,7 +3,7 @@
 // 与「灵境云端账户」共存。
 
 import { useState, type FormEvent } from 'react'
-import { LogIn } from 'lucide-react'
+import { LogIn } from '@/lib/icons'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'

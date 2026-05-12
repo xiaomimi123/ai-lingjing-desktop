@@ -2,7 +2,7 @@
 // 底部右侧显示当前模型名占位（Phase 4+ 接 connection-store 后真接入）。
 
 import { useCallback, useRef, useState, type KeyboardEvent } from 'react'
-import { Send, Square } from 'lucide-react'
+import { Send, Square } from '@/lib/icons'
 import { Button } from '@/components/ui/button'
 import { ModelSelector } from '@/components/chat/ModelSelector'
 import { cn } from '@/lib/utils'

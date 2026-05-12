@@ -17,7 +17,7 @@ import {
   ImageMinus,
   GitBranch,
   type LucideIcon,
-} from 'lucide-react'
+} from '@/lib/icons'
 
 const ICON_MAP: Record<string, LucideIcon> = {
   // 系统内置

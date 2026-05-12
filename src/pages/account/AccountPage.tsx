@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { LogOut, Mail, Coins, BarChart3, RefreshCw, ExternalLink } from 'lucide-react'
+import { LogOut, Mail, Coins, BarChart3, RefreshCw, ExternalLink } from '@/lib/icons'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useLingjingAuthStore } from '@/stores/lingjing-auth-store'

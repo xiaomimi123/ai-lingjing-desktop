@@ -13,7 +13,7 @@
 
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import { useEffect } from 'react'
-import { User, Settings, Sun, Moon, type LucideIcon } from 'lucide-react'
+import { User, Settings, Sun, Moon, type LucideIcon } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useAgentStore } from '@/stores/agent-store'

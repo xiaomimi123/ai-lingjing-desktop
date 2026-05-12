@@ -2,7 +2,7 @@
 // 当前正在执行的 run 实时显示；历史 run 从 store.history 取静态快照。
 
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft } from '@/lib/icons'
 import { Button } from '@/components/ui/button'
 import { TaskExecutionPanel } from '@/components/tasks/TaskExecutionPanel'
 import { useTaskStore } from '@/stores/task-store'

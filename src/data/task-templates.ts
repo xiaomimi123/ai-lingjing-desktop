@@ -16,7 +16,7 @@ import {
   Braces,
   Save,
   type LucideIcon,
-} from 'lucide-react'
+} from '@/lib/icons'
 
 export type SafetyLevel = 'safe' | 'caution' | 'danger'
 

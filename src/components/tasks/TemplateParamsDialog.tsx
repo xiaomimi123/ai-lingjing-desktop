@@ -20,7 +20,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { ChevronDown, FolderOpen, FileSearch, Save } from 'lucide-react'
+import { ChevronDown, FolderOpen, FileSearch, Save } from '@/lib/icons'
 import { ipc } from '@/services/ipc'
 import type { TaskTemplate } from '@/data/task-templates'
 import { cn } from '@/lib/utils'

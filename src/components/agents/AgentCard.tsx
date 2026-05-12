@@ -1,6 +1,6 @@
 // Agent 卡片。激活态用绿色边框 + checkmark。usageCount 显示使用次数。
 
-import { CheckCircle2, Loader2 } from 'lucide-react'
+import { CheckCircle2, Loader2 } from '@/lib/icons'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'

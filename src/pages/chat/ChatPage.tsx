@@ -2,7 +2,7 @@
 // 顶栏显示当前会话 Key（只读 + 复制按钮） + 拉历史 / 清空 / SSE 连接指示。
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Copy, Check, RefreshCw, Trash2, MessageCircle } from 'lucide-react'
+import { Copy, Check, RefreshCw, Trash2, MessageCircle } from '@/lib/icons'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
