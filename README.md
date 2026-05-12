@@ -23,14 +23,19 @@
 - **🎭 多 Agent 角色** — 内置文件管家 / 文档专家 / 数据分析师 / 写作助手 / 程序员 5 个预置 Agent，可在「我的 Agent」一键切换
 - **🔐 本地运行** — 数据全部在本机 SQLite + OpenClaw workspace，不上云
 
-## 📦 下载
+## 📦 安装
 
-最新 dmg 在 [Releases](../../releases) 页面：
+v1.0 暂不提供官方 dmg（首次发布走源码自行构建）。需要 Mac + Node.js v22+：
 
-- `灵境-1.0.0-arm64.dmg` — Apple Silicon (M1/M2/M3/M4)
-- `灵境-1.0.0.dmg` — Intel Mac
+```bash
+git clone https://github.com/xiaomimi123/ai-lingjing-desktop.git
+cd ai-lingjing-desktop
+npm install
+cp .env.example .env  # 至少设 AUTH_USERNAME / AUTH_PASSWORD
+npm run dist:mac      # 产物：release/灵境-1.0.0-{arm64,}.dmg
+```
 
-> 未签名，首次打开需在「系统设置 → 隐私与安全性」点「仍要打开」。
+得到 dmg 后双击安装。未签名，首次打开需在「系统设置 → 隐私与安全性」点「仍要打开」。
 
 ## 🛠 开发
 
