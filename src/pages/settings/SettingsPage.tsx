@@ -16,7 +16,6 @@ import { useAuth } from '@/hooks/useAuth'
 import { ipc } from '@/services/ipc'
 import { ClawHubSourceCard } from '@/components/settings/ClawHubSourceCard'
 import { RuntimeStatusCard } from '@/components/settings/RuntimeStatusCard'
-import { ChatEngineCard } from '@/components/settings/ChatEngineCard'
 
 const APPROVALS_PATH = '~/.openclaw/exec-approvals.json'
 const OPENCLAW_DOCS_URL = 'https://github.com/openclaw/openclaw'
@@ -200,9 +199,6 @@ export function SettingsPage() {
             </div>
           </CardContent>
         </Card>
-
-        {/* 对话引擎切换（OpenClaw / Hermes） */}
-        <ChatEngineCard />
 
         {/* AI 运行环境（Node + OpenClaw bundled） */}
         <RuntimeStatusCard />

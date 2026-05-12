@@ -1,5 +1,12 @@
-// 路由表。v1 范围按 PRD §5.7 + §5.8 简化版（核心区 4 + 底部 2）。
-// /onboarding 是独立路由（不在 AppLayout 内），跳过侧栏。
+// 路由表（Phase 17.2 重构）：
+//
+// /                       → /openclaw/chat（默认产品默认页）
+// /onboarding             → onboarding 单独，跳过 AppLayout
+// /openclaw/chat | tasks | tasks/:id | agents | skills | cron | channels
+// /hermes/chat            → Hermes 唯一已实现的二级页
+// /hermes/<anything-else> → redirect 到 /hermes/chat（v1.2 之前 placeholder）
+// /account | /account/usage | /settings → 顶级共享
+// /*                       → 404 PlaceholderPage
 
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { AppLayout } from '@/components/layout/AppLayout'
@@ -25,17 +32,37 @@ export const router = createBrowserRouter([
     path: '/',
     element: <AppLayout />,
     children: [
-      { index: true, element: <Navigate to="/chat" replace /> },
-      { path: 'chat', element: <ChatPage /> },
-      { path: 'tasks', element: <TaskCenter /> },
-      { path: 'tasks/:id', element: <TaskExecutionPage /> },
-      { path: 'agents', element: <AgentList /> },
-      { path: 'skills', element: <SkillsPage /> },
-      { path: 'cron', element: <CronPage /> },
-      { path: 'channels', element: <ChannelsPage /> },
+      // 默认跳 OpenClaw 主页
+      { index: true, element: <Navigate to="/openclaw/chat" replace /> },
+
+      // OpenClaw 二级页
+      { path: 'openclaw', element: <Navigate to="/openclaw/chat" replace /> },
+      { path: 'openclaw/chat', element: <ChatPage /> },
+      { path: 'openclaw/tasks', element: <TaskCenter /> },
+      { path: 'openclaw/tasks/:id', element: <TaskExecutionPage /> },
+      { path: 'openclaw/agents', element: <AgentList /> },
+      { path: 'openclaw/skills', element: <SkillsPage /> },
+      { path: 'openclaw/cron', element: <CronPage /> },
+      { path: 'openclaw/channels', element: <ChannelsPage /> },
+
+      // Hermes 仅对话已接（其他 redirect 回 chat）
+      { path: 'hermes', element: <Navigate to="/hermes/chat" replace /> },
+      { path: 'hermes/chat', element: <ChatPage /> },
+      { path: 'hermes/*', element: <Navigate to="/hermes/chat" replace /> },
+
+      // 顶级共享
       { path: 'account', element: <AccountPage /> },
       { path: 'account/usage', element: <UsagePage /> },
       { path: 'settings', element: <SettingsPage /> },
+
+      // 老 URL 向后兼容（v1.0 时期硬编码 /chat /agents 等）
+      { path: 'chat', element: <Navigate to="/openclaw/chat" replace /> },
+      { path: 'tasks', element: <Navigate to="/openclaw/tasks" replace /> },
+      { path: 'agents', element: <Navigate to="/openclaw/agents" replace /> },
+      { path: 'skills', element: <Navigate to="/openclaw/skills" replace /> },
+      { path: 'cron', element: <Navigate to="/openclaw/cron" replace /> },
+      { path: 'channels', element: <Navigate to="/openclaw/channels" replace /> },
+
       {
         path: '*',
         element: (

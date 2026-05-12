@@ -1,9 +1,11 @@
-// 主布局：TitleBar 顶 + Sidebar 左 + Outlet 中 + StatusBar 底。
+// 主布局：TitleBar 顶 + Sidebar(48px 一级) + SecondaryPanel(192px 二级) + Outlet 主 + StatusBar 底。
 // 灵境云端 session 检查：未登录就 redirect 到 /onboarding（除非已经在 onboarding）。
+// 顶级页面（/account /settings）不显示 SecondaryPanel — 由它内部 return null 决定。
 
 import { useEffect } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
+import { SecondaryPanel } from './SecondaryPanel'
 import { TitleBar } from './TitleBar'
 import { StatusBar } from './StatusBar'
 import { useLingjingAuthStore } from '@/stores/lingjing-auth-store'
@@ -25,6 +27,7 @@ export function AppLayout() {
       <TitleBar />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar />
+        <SecondaryPanel />
         <main className="flex-1 overflow-auto">
           <Outlet />
         </main>

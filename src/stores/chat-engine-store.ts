@@ -1,31 +1,40 @@
-// Phase 16 AI 引擎切换。
+// 兼容 alias：v17.2 把一级产品建模搬到 product-store.ts，老调用通过本文件桥接，
+// 后续 phase 把所有 useChatEngineStore 改成 useProductStore 后删本文件。
 //
-// 'openclaw'：默认，走 OpenClaw Gateway ws://18789（chat.send RPC + SSE 累积流）
-// 'hermes':  走 Hermes Gateway :8642（/api/hermes/v1/runs + SSE 增量流）
-//
-// 当前只影响「对话」页（Phase 16 细粒度）。Cron/Skills/Channels 仍是 OpenClaw。
+// 老接口：engine / setEngine / hermesSessionId / setHermesSessionId
+// 新接口：product / setProduct / hermesSessionId / setHermesSessionId
 
-import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { useProductStore } from './product-store'
+import type { ProductId } from './product-store'
 
-export type ChatEngine = 'openclaw' | 'hermes'
+export type ChatEngine = ProductId
 
-interface State {
+/**
+ * 兼容 hook：自动把 product 字段映射成 engine。
+ * 旧调用 useChatEngineStore((s) => s.engine) → 等价 useProductStore((s) => s.product)
+ * 旧调用 useChatEngineStore((s) => s.setEngine) → 等价 useProductStore((s) => s.setProduct)
+ */
+export function useChatEngineStore<T>(selector: (s: {
   engine: ChatEngine
-  /** Hermes 当前对话的 session_id（=首次创建时的 run_id）。续接对话时传给 POST /v1/runs */
   hermesSessionId: string | null
   setEngine: (e: ChatEngine) => void
   setHermesSessionId: (id: string | null) => void
+}) => T): T {
+  return useProductStore((s) => selector({
+    engine: s.product,
+    hermesSessionId: s.hermesSessionId,
+    setEngine: s.setProduct,
+    setHermesSessionId: s.setHermesSessionId,
+  }))
 }
 
-export const useChatEngineStore = create<State>()(
-  persist(
-    (set) => ({
-      engine: 'openclaw',
-      hermesSessionId: null,
-      setEngine: (engine) => set({ engine }),
-      setHermesSessionId: (hermesSessionId) => set({ hermesSessionId }),
-    }),
-    { name: 'lingjing-chat-engine' },
-  ),
-)
+// getState 兼容：old code 用 useChatEngineStore.getState().engine
+useChatEngineStore.getState = () => {
+  const s = useProductStore.getState()
+  return {
+    engine: s.product,
+    hermesSessionId: s.hermesSessionId,
+    setEngine: s.setProduct,
+    setHermesSessionId: s.setHermesSessionId,
+  }
+}
