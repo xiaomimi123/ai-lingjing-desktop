@@ -65,6 +65,8 @@ contextBridge.exposeInMainWorld('lingjing', {
   runtimeStatus: () => ipcRenderer.invoke('lingjing:runtime-status'),
   runtimeEnsureNode: () => ipcRenderer.invoke('lingjing:runtime-ensure-node'),
   runtimeEnsureOpenClaw: () => ipcRenderer.invoke('lingjing:runtime-ensure-openclaw'),
+  runtimeUninstall: () => ipcRenderer.invoke('lingjing:runtime-uninstall'),
+  runtimeDiskUsage: () => ipcRenderer.invoke('lingjing:runtime-disk-usage'),
   runtimeOnProgress: (cb) => {
     const listener = (_evt, payload) => cb(payload)
     ipcRenderer.on('lingjing:runtime-progress', listener)

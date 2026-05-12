@@ -15,6 +15,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { useAuth } from '@/hooks/useAuth'
 import { ipc } from '@/services/ipc'
 import { ClawHubSourceCard } from '@/components/settings/ClawHubSourceCard'
+import { RuntimeStatusCard } from '@/components/settings/RuntimeStatusCard'
 
 const APPROVALS_PATH = '~/.openclaw/exec-approvals.json'
 const OPENCLAW_DOCS_URL = 'https://github.com/openclaw/openclaw'
@@ -198,6 +199,9 @@ export function SettingsPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* AI 运行环境（Node + OpenClaw bundled） */}
+        <RuntimeStatusCard />
 
         {/* 技能商城源 */}
         <ClawHubSourceCard />

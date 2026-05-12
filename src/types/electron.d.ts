@@ -126,6 +126,8 @@ export interface LingjingPreload {
     error?: string
     message?: string
   }>
+  runtimeUninstall(): Promise<{ ok: boolean; removed?: string; message?: string }>
+  runtimeDiskUsage(): Promise<{ ok: boolean; bytes: number; path: string }>
   runtimeOnProgress(cb: (progress: RuntimeProgress) => void): () => void
   selectFile(opts?: SelectFileOptions): Promise<SelectResult>
   selectFolder(opts?: SelectFolderOptions): Promise<SelectResult>

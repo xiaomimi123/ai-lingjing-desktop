@@ -746,6 +746,46 @@ ipcMain.handle('lingjing:runtime-ensure-openclaw', async () => {
   return result
 })
 
+// 删 userData/runtime/ — 强制重装时用。下次启动 onboarding 会重弹。
+ipcMain.handle('lingjing:runtime-uninstall', async () => {
+  const userData = app.getPath('userData')
+  const runtimeDir = path.join(userData, 'runtime')
+  try {
+    await fs.rm(runtimeDir, { recursive: true, force: true })
+    return { ok: true, removed: runtimeDir }
+  } catch (e) {
+    return { ok: false, message: String(e?.message || e) }
+  }
+})
+
+// 计算 runtime 目录大小（给 Settings 显示磁盘占用）
+ipcMain.handle('lingjing:runtime-disk-usage', async () => {
+  const userData = app.getPath('userData')
+  const runtimeDir = path.join(userData, 'runtime')
+  async function dirSize(dir) {
+    let total = 0
+    let entries
+    try {
+      entries = await fs.readdir(dir, { withFileTypes: true })
+    } catch {
+      return 0
+    }
+    for (const e of entries) {
+      const p = path.join(dir, e.name)
+      try {
+        if (e.isDirectory()) total += await dirSize(p)
+        else if (e.isFile()) {
+          const st = await fs.stat(p)
+          total += st.size
+        }
+      } catch { /* skip */ }
+    }
+    return total
+  }
+  const bytes = await dirSize(runtimeDir)
+  return { ok: true, bytes, path: runtimeDir }
+})
+
 ipcMain.handle('lingjing:open-external', async (_event, url) => {
   if (typeof url !== 'string') return { ok: false, message: 'invalid url' }
   // 只允许 http/https,防 file:// 攻击

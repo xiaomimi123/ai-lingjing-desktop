@@ -156,6 +156,16 @@ export const ipc = {
     return window.lingjing.runtimeEnsureOpenClaw()
   },
 
+  runtimeUninstall() {
+    if (!window.lingjing) return Promise.resolve(notInElectron({ ok: false }))
+    return window.lingjing.runtimeUninstall()
+  },
+
+  runtimeDiskUsage() {
+    if (!window.lingjing) return Promise.resolve(notInElectron({ ok: false, bytes: 0, path: '' }))
+    return window.lingjing.runtimeDiskUsage()
+  },
+
   runtimeOnProgress(cb: (p: unknown) => void): () => void {
     if (!window.lingjing) return () => {}
     return window.lingjing.runtimeOnProgress(cb as never)
