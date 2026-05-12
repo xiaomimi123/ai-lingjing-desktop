@@ -421,8 +421,10 @@ function ProgressDialog({
   const [lines, setLines] = useState<string[]>([])
   const [stage, setStage] = useState<'starting' | 'installing' | 'logging-in' | 'done' | 'failed'>('starting')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
-  const startedRef = useRef(false)
   const scrollRef = useRef<HTMLDivElement>(null)
+  // 用 ref 锁 onDone 避免它变化导致 useEffect 重跑（cleanup unsub 后没人订阅 stdout）
+  const onDoneRef = useRef(onDone)
+  useEffect(() => { onDoneRef.current = onDone })
 
   // 实时滚到底部
   useEffect(() => {
@@ -435,9 +437,6 @@ function ProgressDialog({
   }
 
   useEffect(() => {
-    if (startedRef.current) return
-    startedRef.current = true
-
     const unsub = ipc.channelsOnProgress((raw: unknown) => {
       const p = raw as { stage: string; channel: string; source: string; line: string }
       if (p.channel !== def.id && p.channel !== 'weixin' && p.channel !== 'openclaw-weixin') return
@@ -456,7 +455,7 @@ function ProgressDialog({
           const installResult = await ipc.channelsInstallWeixin()
           if (installResult.ok) {
             setStage('done')
-            setTimeout(() => onDone('微信已连接 ✓'), 1500)
+            setTimeout(() => onDoneRef.current?.('微信已连接 ✓'), 1500)
           } else {
             setStage('failed')
             setErrorMsg(`installer 失败 (exit ${installResult.code})`)
@@ -468,7 +467,7 @@ function ProgressDialog({
           const r = await ipc.channelsLogin(def.id)
           if (r.code === 0) {
             setStage('done')
-            setTimeout(() => onDone(`${def.name} 已连接 ✓`), 1500)
+            setTimeout(() => onDoneRef.current?.(`${def.name} 已连接 ✓`), 1500)
           } else {
             setStage('failed')
             setErrorMsg(`登录失败 (exit ${r.code})`)
@@ -481,7 +480,9 @@ function ProgressDialog({
     })()
 
     return () => unsub()
-  }, [def, onDone])
+    // 只 mount 跑一次。onDone/def 变化不重跑（用 onDoneRef 拿最新引用）。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const stageLabel = {
     starting: '准备中…',
@@ -499,7 +500,7 @@ function ProgressDialog({
 
   return (
     <Dialog open onOpenChange={(o) => !o && stage !== 'logging-in' && onClose()}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-4xl">
         <DialogHeader>
           <DialogTitle>{def.emoji} 连接 {def.name}</DialogTitle>
           <DialogDescription>
@@ -512,16 +513,27 @@ function ProgressDialog({
         </DialogHeader>
 
         <div className="space-y-2">
-          {stage === 'logging-in' && def.method === 'plugin+qrcode' && (
+          {def.method === 'plugin+qrcode' && (
             <div className="rounded-md border border-blue-200 bg-blue-50 p-2 text-[11px] text-blue-800 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-200">
-              如果下方输出含二维码 ASCII（密集的 ██），请用手机微信「扫一扫」对准屏幕。
+              📱 看到二维码（密集的 ██ 方块）后，用手机微信「扫一扫」对准屏幕扫。
+              二维码偏宽，下方面板可左右滚动 — 如果显示不全把窗口拉大点。
             </div>
           )}
-          <ScrollArea className="h-72 rounded-md border bg-black p-2 font-mono text-[10px] text-green-300" ref={scrollRef as never}>
-            <pre className="whitespace-pre-wrap">
+          {/*
+            二维码 ASCII 关键样式：
+            - whitespace-pre（不 wrap）让每行完整渲染
+            - leading-none + tracking-tight 让方块字符垂直/水平挤紧，扫码识别更稳
+            - h-[65vh] 给足够高度展示完整二维码
+            - overflow-x-auto 横向超出可滚动
+          */}
+          <div
+            ref={scrollRef as never}
+            className="h-[65vh] overflow-auto rounded-md border bg-black p-3 font-mono text-[10px] leading-none tracking-tight text-green-300"
+          >
+            <pre className="whitespace-pre">
               {lines.length === 0 ? '等待输出…' : lines.join('\n')}
             </pre>
-          </ScrollArea>
+          </div>
           {errorMsg && (
             <div className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">
               {errorMsg}

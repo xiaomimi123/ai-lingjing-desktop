@@ -179,18 +179,21 @@ export async function removeChannel(userDataPath, channelName, account) {
 
 /**
  * 安装腾讯微信 plugin（@tencent-weixin/openclaw-weixin-cli install）。
- * 用 bundled npm 跑 npx，避免污染系统 npm 全局。
+ * 优先用 bundled npx；bundled 没装时 fallback PATH 解析（系统装的 Node 也行）。
  * onLine 必传：plugin 装好后流程会自动 channels add，输出实时推前端。
  */
 export async function installWeixinPlugin(userDataPath, opts = {}) {
   const { onLine } = opts
   const npmRoot = path.join(userDataPath, 'runtime', 'node')
-  const npx = IS_WIN ? path.join(npmRoot, 'npx.cmd') : path.join(npmRoot, 'bin', 'npx')
+  const bundledNpx = IS_WIN ? path.join(npmRoot, 'npx.cmd') : path.join(npmRoot, 'bin', 'npx')
 
+  // bundled 优先；不存在就 fallback 让 PATH 解析（spawn 'npx' 会按 PATH 找）
+  let npx = bundledNpx
   try {
-    await fs.access(npx)
+    await fs.access(bundledNpx)
   } catch {
-    return { code: -1, ok: false, stderr: 'bundled npx 不存在，请先在 onboarding 装好 Node runtime' }
+    npx = IS_WIN ? 'npx.cmd' : 'npx'  // PATH 解析
+    onLine?.('（bundled Node 未装，fallback 用系统 npx；若失败请去 Settings 装运行环境）', 'stderr')
   }
 
   const env = {
@@ -205,6 +208,7 @@ export async function installWeixinPlugin(userDataPath, opts = {}) {
     const proc = spawn(npx, ['-y', '@tencent-weixin/openclaw-weixin-cli@latest', 'install'], {
       stdio: ['ignore', 'pipe', 'pipe'],
       env,
+      shell: IS_WIN,  // Win 用 shell 解析 .cmd
     })
     let stdout = ''
     let stderr = ''
