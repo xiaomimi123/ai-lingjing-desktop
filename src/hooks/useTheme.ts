@@ -6,6 +6,9 @@ import { useCallback, useEffect, useState } from 'react'
 type Theme = 'light' | 'dark' | 'system'
 
 const STORAGE_KEY = 'lingjing-theme'
+// 自定义事件让同 tab 内多个 useTheme 实例（Sidebar / App / ChatMessage 等）
+// setTheme 后同步 state — localStorage 写在同 tab 内不触发 storage event
+const SYNC_EVENT = 'lingjing-theme-sync'
 
 function readSaved(): Theme {
   if (typeof window === 'undefined') return 'system'
@@ -41,9 +44,20 @@ export function useTheme() {
     return () => mq.removeEventListener('change', onChange)
   }, [theme])
 
+  // 跨实例同步：监听 custom event，setter 派发
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as Theme
+      setThemeState(detail)
+    }
+    window.addEventListener(SYNC_EVENT, handler)
+    return () => window.removeEventListener(SYNC_EVENT, handler)
+  }, [])
+
   const setTheme = useCallback((t: Theme) => {
     setThemeState(t)
     try { localStorage.setItem(STORAGE_KEY, t) } catch {}
+    window.dispatchEvent(new CustomEvent(SYNC_EVENT, { detail: t }))
   }, [])
 
   const isDark = theme === 'dark' || (theme === 'system' && systemDark())

@@ -13,11 +13,12 @@
 
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import { useEffect } from 'react'
-import { User, Settings, type LucideIcon } from 'lucide-react'
+import { User, Settings, Sun, Moon, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useAgentStore } from '@/stores/agent-store'
 import { useProductStore, type ProductId } from '@/stores/product-store'
+import { useTheme } from '@/hooks/useTheme'
 
 interface ProductItem {
   id: ProductId
@@ -74,6 +75,32 @@ function ProductRailItem({ item }: { item: ProductItem }) {
       </TooltipTrigger>
       <TooltipContent side="right" sideOffset={8} className="text-xs">
         {item.label}
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
+function ThemeToggleItem() {
+  const { isDark, setTheme } = useTheme()
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          onClick={() => setTheme(isDark ? 'light' : 'dark')}
+          className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
+          aria-label={isDark ? '切换浅色模式' : '切换深色模式'}
+          data-testid="theme-toggle"
+        >
+          {isDark ? (
+            <Sun className="h-[18px] w-[18px]" strokeWidth={1.75} />
+          ) : (
+            <Moon className="h-[18px] w-[18px]" strokeWidth={1.75} />
+          )}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="right" sideOffset={8} className="text-xs">
+        {isDark ? '切换浅色模式' : '切换深色模式'}
       </TooltipContent>
     </Tooltip>
   )
@@ -137,8 +164,10 @@ export function Sidebar() {
 
         <div className="flex-1" />
 
-        {/* 底部：账号 + 设置（avatar 已移除——跟「灵境账号」User icon 重复）*/}
+        {/* 底部：主题切换 + 账号 + 设置 */}
         <div className="flex flex-col items-center gap-1">
+          <ThemeToggleItem />
+          <div className="my-1 h-px w-6 bg-border" aria-hidden />
           {BOTTOM.map((item) => (
             <BottomRailItem key={item.to} item={item} />
           ))}
