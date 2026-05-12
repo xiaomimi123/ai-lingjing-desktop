@@ -16,6 +16,13 @@ import { useAuth } from '@/hooks/useAuth'
 import { ipc } from '@/services/ipc'
 import { ClawHubSourceCard } from '@/components/settings/ClawHubSourceCard'
 import { RuntimeStatusCard } from '@/components/settings/RuntimeStatusCard'
+import {
+  VerticalTabs,
+  VerticalTabsList,
+  VerticalTabsTrigger,
+  VerticalTabsContent,
+} from '@/components/ui/tabs-vertical'
+import { SlidersHorizontal, Hexagon, Info, ShieldAlert as ShieldAlertIcon } from 'lucide-react'
 
 const APPROVALS_PATH = '~/.openclaw/exec-approvals.json'
 const OPENCLAW_DOCS_URL = 'https://github.com/openclaw/openclaw'
@@ -86,38 +93,64 @@ export function SettingsPage() {
   }, [])
 
   return (
-    <div className="h-full overflow-auto">
-      <div className="mx-auto max-w-3xl space-y-4 p-6">
-        <div>
-          <h1 className="text-2xl font-semibold">设置</h1>
-          <p className="text-sm text-muted-foreground">本地后端、OpenClaw 沙箱、应用偏好</p>
+    <VerticalTabs defaultValue="general" className="h-full">
+      <VerticalTabsList>
+        <div className="mb-2 px-2 pt-1 text-base font-semibold">设置</div>
+        <VerticalTabsTrigger value="general">
+          <SlidersHorizontal className="h-4 w-4" strokeWidth={1.5} />
+          <span>通用</span>
+        </VerticalTabsTrigger>
+        <VerticalTabsTrigger value="openclaw">
+          <Hexagon className="h-4 w-4" strokeWidth={1.5} />
+          <span>OpenClaw</span>
+        </VerticalTabsTrigger>
+        <VerticalTabsTrigger value="about">
+          <Info className="h-4 w-4" strokeWidth={1.5} />
+          <span>关于</span>
+        </VerticalTabsTrigger>
+      </VerticalTabsList>
+
+      <VerticalTabsContent value="general" className="p-6">
+        <div className="mx-auto max-w-2xl space-y-4">
+          <div>
+            <h2 className="text-lg font-semibold">通用</h2>
+            <p className="text-xs text-muted-foreground">本地后端 + 应用偏好</p>
+          </div>
+
+          {/* 后端认证 */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm">本地后端</CardTitle>
+              <CardDescription className="text-xs">
+                本地 Express 后端用 AUTH_USERNAME/AUTH_PASSWORD（来自 .env）做身份验证
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="flex items-center gap-3">
+                <span className="text-sm">
+                  状态：
+                  <span className="ml-1 font-mono">{authEnabled ? '已启用' : '未启用'}</span>
+                </span>
+                {authEnabled && (
+                  <Button size="sm" variant="outline" onClick={logout} data-testid="settings-logout">
+                    <LogOut className="mr-1 h-3.5 w-3.5" /> 退出登录
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </div>
+      </VerticalTabsContent>
 
-        {/* 后端认证 */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">本地后端</CardTitle>
-            <CardDescription>
-              本地 Express 后端用 AUTH_USERNAME/AUTH_PASSWORD（来自 .env）做身份验证。
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-3">
-              <span className="text-sm">
-                状态：
-                <span className="ml-1 font-mono">{authEnabled ? '已启用' : '未启用'}</span>
-              </span>
-              {authEnabled && (
-                <Button size="sm" variant="outline" onClick={logout} data-testid="settings-logout">
-                  <LogOut className="mr-1 h-3.5 w-3.5" /> 退出登录
-                </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+      <VerticalTabsContent value="openclaw" className="p-6">
+        <div className="mx-auto max-w-2xl space-y-4">
+          <div>
+            <h2 className="text-lg font-semibold">OpenClaw</h2>
+            <p className="text-xs text-muted-foreground">沙箱策略、AI 运行环境、技能商城源</p>
+          </div>
 
-        {/* OpenClaw 沙箱策略 */}
-        <Card>
+          {/* OpenClaw 沙箱策略 */}
+          <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
@@ -200,29 +233,38 @@ export function SettingsPage() {
           </CardContent>
         </Card>
 
-        {/* AI 运行环境（Node + OpenClaw bundled） */}
-        <RuntimeStatusCard />
+          {/* AI 运行环境（Node + OpenClaw bundled） */}
+          <RuntimeStatusCard />
 
-        {/* 技能商城源 */}
-        <ClawHubSourceCard />
+          {/* 技能商城源 */}
+          <ClawHubSourceCard />
+        </div>
+      </VerticalTabsContent>
 
-        {/* 应用信息 */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">应用</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-1 text-xs">
-            <div>
-              <span className="text-muted-foreground">平台：</span>
-              <span className="font-mono">{ipc.platform}</span>
-            </div>
-            <div>
-              <span className="text-muted-foreground">Electron：</span>
-              <span className="font-mono">{ipc.version || '浏览器环境'}</span>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+      <VerticalTabsContent value="about" className="p-6">
+        <div className="mx-auto max-w-2xl space-y-4">
+          <div>
+            <h2 className="text-lg font-semibold">关于</h2>
+            <p className="text-xs text-muted-foreground">版本与运行时信息</p>
+          </div>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm">应用</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-1.5 pt-0 text-xs">
+              <div className="flex items-center justify-between border-b py-1.5">
+                <span className="text-muted-foreground">平台</span>
+                <span className="font-mono">{ipc.platform}</span>
+              </div>
+              <div className="flex items-center justify-between py-1.5">
+                <span className="text-muted-foreground">Electron</span>
+                <span className="font-mono">{ipc.version || '浏览器环境'}</span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </VerticalTabsContent>
+    </VerticalTabs>
   )
 }
