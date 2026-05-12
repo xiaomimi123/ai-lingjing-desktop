@@ -12,7 +12,9 @@
 
 import { useCallback, useEffect, useRef } from 'react'
 import { openClaw } from '@/services/openclaw-rpc'
+import { sendHermesMessage, type HermesRunMessage } from '@/services/hermes-api'
 import { useChatStore, type ChatMessage } from '@/stores/chat-store'
+import { useChatEngineStore } from '@/stores/chat-engine-store'
 import { useEventStream, type AgentEvent } from '@/hooks/useEventStream'
 
 function uuid() {
@@ -121,11 +123,16 @@ export function useChat() {
     async (text: string) => {
       const trimmed = text.trim()
       if (!trimmed) return
+      const engine = useChatEngineStore.getState().engine
+
+      // OpenClaw 走 sessionKey + chat.send + SSE 累积流（原逻辑）
+      // Hermes 走 /api/hermes/v1/runs + SSE 增量流（不需要 sessionKey）
       const sessionKey = useChatStore.getState().sessionKey
-      if (!sessionKey) {
+      if (engine === 'openclaw' && !sessionKey) {
         store.setError('请先选择会话')
         return
       }
+
       const idempotencyKey = uuid()
       const userMsg: ChatMessage = {
         id: idempotencyKey,
@@ -145,16 +152,56 @@ export function useChat() {
       store.setSending(true)
       store.setError(null)
       activeRunIdRef.current = idempotencyKey
+
       try {
-        await openClaw.sendChat({ sessionKey, message: trimmed, idempotencyKey })
-        // 90s watchdog：若 SSE 终态丢了，强制翻 false
-        setTimeout(() => {
-          if (activeRunIdRef.current === idempotencyKey) {
-            useChatStore.getState().setSending(false)
-            useChatStore.getState().finalizeLastAssistant()
-            activeRunIdRef.current = null
+        if (engine === 'openclaw') {
+          await openClaw.sendChat({ sessionKey, message: trimmed, idempotencyKey })
+          // 90s watchdog：若 SSE 终态丢了，强制翻 false
+          setTimeout(() => {
+            if (activeRunIdRef.current === idempotencyKey) {
+              useChatStore.getState().setSending(false)
+              useChatStore.getState().finalizeLastAssistant()
+              activeRunIdRef.current = null
+            }
+          }, 90_000)
+        } else {
+          // Hermes 分支：把当前 store 已有 messages 转成 input 数组 + 当前消息
+          // 走 sendHermesMessage 自己管 SSE，onDelta 实时 append 到最后一条 assistant
+          const history = useChatStore.getState().messages
+          const input: HermesRunMessage[] = []
+          for (const m of history) {
+            if (m.id === assistantPlaceholder.id) continue // 跳占位
+            if (m.role === 'user' || m.role === 'assistant' || m.role === 'system') {
+              const txt = typeof m.content === 'string' ? m.content : ''
+              if (txt) input.push({ role: m.role, content: txt })
+            }
           }
-        }, 90_000)
+
+          let accumulated = ''
+          await sendHermesMessage(input, {
+            onDelta: (_chunk, accu) => {
+              accumulated = accu
+              // 替换最后一条 assistant 内容
+              useChatStore.setState((s) => {
+                const msgs = s.messages
+                if (msgs.length === 0) return s
+                const last = msgs[msgs.length - 1]
+                if (last.role !== 'assistant') return s
+                return { messages: [...msgs.slice(0, -1), { ...last, content: accumulated, streaming: true }] }
+              })
+            },
+          })
+          // 结束：finalize
+          useChatStore.setState((s) => {
+            const msgs = s.messages
+            if (msgs.length === 0) return s
+            const last = msgs[msgs.length - 1]
+            if (last.role !== 'assistant') return s
+            return { messages: [...msgs.slice(0, -1), { ...last, content: accumulated || last.content, streaming: false }] }
+          })
+          store.setSending(false)
+          activeRunIdRef.current = null
+        }
       } catch (e) {
         store.setError(e instanceof Error ? e.message : String(e))
         store.removeMessageById(assistantPlaceholder.id)
