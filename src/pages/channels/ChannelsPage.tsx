@@ -1,31 +1,146 @@
-// 通信渠道页（MVP）。
-// channels.status 只读展示当前配置；OAuth 配对走 openclaw channels CLI（v1.1+ 内置）。
+// 通信渠道 — Phase 15.1.2 完整版
+// 让 Agent 通过外部 IM 收发消息。
+//
+// 国内活跃 3 个：微信（@tencent-weixin/openclaw-weixin plugin）/ 飞书 / QQ Bot
+// 国际 3 个：Telegram / Discord / Slack（标灰，需梯子才能用）
+//
+// 不同 channel 走不同接入流程（plugin+qrcode / oauth-login / bot-token / bot-app-token），
+// 详见 CHANNEL_DEFS 里 method 字段。
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  MessageCircle,
+  CheckCircle2,
+  Loader2,
+  Plug,
   RefreshCw,
-  Terminal as TerminalIcon,
+  Unplug,
+  AlertTriangle,
   ExternalLink,
+  Globe2,
+  Copy,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { getChannelsStatus, type ChannelsStatus } from '@/services/channels-api'
 import { ipc } from '@/services/ipc'
+import { getChannelsStatus, type ChannelsStatus } from '@/services/channels-api'
 
-const OPENCLAW_CHANNELS_DOC = 'https://github.com/openclaw/openclaw#channels'
+type ConnectMethod = 'plugin+qrcode' | 'oauth-login' | 'bot-token' | 'bot-app-token'
+
+interface ChannelDef {
+  id: string          // openclaw --channel 取值（微信特殊用 'weixin'）
+  name: string
+  emoji: string
+  region: 'cn' | 'intl'
+  method: ConnectMethod
+  description: string
+  // bot-token / bot-app-token 时的表单字段定义
+  fields?: Array<{ key: string; label: string; placeholder: string; type?: 'password' | 'text' }>
+  // 国内需梯子 / 不能用的提示
+  caveat?: string
+}
+
+const CHANNEL_DEFS: ChannelDef[] = [
+  {
+    id: 'weixin',
+    name: '微信',
+    emoji: '💬',
+    region: 'cn',
+    method: 'plugin+qrcode',
+    description: '通过腾讯官方 plugin @tencent-weixin/openclaw-weixin 接入。扫码登录。',
+  },
+  {
+    id: 'feishu',
+    name: '飞书',
+    emoji: '📱',
+    region: 'cn',
+    method: 'oauth-login',
+    description: 'OpenClaw 原生支持。点连接后跑 openclaw channels login --channel feishu，按提示完成 OAuth。',
+  },
+  {
+    id: 'qqbot',
+    name: 'QQ Bot',
+    emoji: '🐧',
+    region: 'cn',
+    method: 'bot-token',
+    description: 'OpenClaw 原生支持。需要 QQ 频道机器人 token（在 q.qq.com 申请）。',
+    fields: [
+      { key: 'token', label: 'Bot Token', placeholder: 'qq bot token', type: 'password' },
+      { key: 'name', label: '账号显示名（可选）', placeholder: '主账号' },
+    ],
+  },
+  {
+    id: 'telegram',
+    name: 'Telegram',
+    emoji: '✈️',
+    region: 'intl',
+    method: 'bot-token',
+    description: '需要梯子。OpenClaw 原生。@BotFather 申请 bot token。',
+    fields: [
+      { key: 'token', label: 'Bot Token', placeholder: '123456:ABC-...', type: 'password' },
+      { key: 'name', label: '账号显示名（可选）', placeholder: '主账号' },
+    ],
+    caveat: '国内访问需梯子',
+  },
+  {
+    id: 'discord',
+    name: 'Discord',
+    emoji: '🎮',
+    region: 'intl',
+    method: 'bot-token',
+    description: '需要梯子。在 discord.com/developers/applications 创建 bot 拿 token。',
+    fields: [
+      { key: 'token', label: 'Bot Token', placeholder: 'discord bot token', type: 'password' },
+      { key: 'name', label: '账号显示名（可选）', placeholder: '主账号' },
+    ],
+    caveat: '国内访问需梯子',
+  },
+  {
+    id: 'slack',
+    name: 'Slack',
+    emoji: '#️⃣',
+    region: 'intl',
+    method: 'bot-app-token',
+    description: '需要 Slack workspace 管理员权限。要 bot token (xoxb-) 和 app token (xapp-)。',
+    fields: [
+      { key: 'bot-token', label: 'Bot Token (xoxb-...)', placeholder: 'xoxb-...', type: 'password' },
+      { key: 'app-token', label: 'App Token (xapp-...)', placeholder: 'xapp-...', type: 'password' },
+      { key: 'name', label: '账号显示名（可选）', placeholder: '主账号' },
+    ],
+    caveat: '国内访问需梯子',
+  },
+]
+
+interface ConnectionState {
+  // channel id → 当前是否已连
+  [channelId: string]: { connected: boolean; account?: string; detail?: string }
+}
 
 export function ChannelsPage() {
   const [status, setStatus] = useState<ChannelsStatus | null>(null)
+  const [connections, setConnections] = useState<ConnectionState>({})
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [dialog, setDialog] = useState<{ kind: 'form' | 'progress'; channel: ChannelDef } | null>(null)
+  const [toast, setToast] = useState<string | null>(null)
 
   const reload = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      setStatus(await getChannelsStatus())
+      const s = await getChannelsStatus()
+      setStatus(s)
+      // channels.status 的 channelOrder 列出已配置的 channel id
+      const map: ConnectionState = {}
+      for (const cid of s.channelOrder ?? []) {
+        map[cid] = {
+          connected: true,
+          detail: s.channelDetailLabels?.[cid] ?? '',
+        }
+      }
+      setConnections(map)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -34,11 +149,38 @@ export function ChannelsPage() {
   }, [])
 
   useEffect(() => {
-    reload()
+    void reload()
   }, [reload])
 
-  const channelCount = status?.channelOrder.length ?? 0
-  const isEmpty = channelCount === 0
+  const showToast = useCallback((msg: string) => {
+    setToast(msg)
+    setTimeout(() => setToast(null), 4000)
+  }, [])
+
+  const handleDisconnect = useCallback(async (def: ChannelDef) => {
+    if (!window.confirm(`断开 ${def.name}？后续 Agent 无法通过此渠道收发消息。`)) return
+    setLoading(true)
+    try {
+      const targetChannel = def.id === 'weixin' ? 'openclaw-weixin' : def.id
+      const r = await ipc.channelsRemove(targetChannel)
+      showToast(r.ok ? `${def.name} 已断开` : `断开失败：${r.message || ''}`)
+      if (r.ok) await reload()
+    } finally {
+      setLoading(false)
+    }
+  }, [reload, showToast])
+
+  const handleConnect = useCallback((def: ChannelDef) => {
+    if (def.method === 'plugin+qrcode' || def.method === 'oauth-login') {
+      setDialog({ kind: 'progress', channel: def })
+    } else {
+      setDialog({ kind: 'form', channel: def })
+    }
+  }, [])
+
+  // ip 隔离两组（国内常用 / 国际需梯子）
+  const cnChannels = CHANNEL_DEFS.filter((c) => c.region === 'cn')
+  const intlChannels = CHANNEL_DEFS.filter((c) => c.region === 'intl')
 
   return (
     <div className="h-full overflow-auto">
@@ -47,8 +189,7 @@ export function ChannelsPage() {
           <div>
             <h1 className="text-2xl font-semibold">通信渠道</h1>
             <p className="text-sm text-muted-foreground">
-              让 Agent 主动通过 Slack / 飞书 / 微信 / 邮件 等渠道发消息。MVP 只读，
-              配对/认证暂时走 openclaw CLI。
+              让 Agent 通过外部 IM 收发消息：在飞书群发周报、Telegram 私聊跑命令、QQ 频道里接收 trigger。
             </p>
           </div>
           <Button size="sm" variant="outline" onClick={reload} disabled={loading}>
@@ -63,90 +204,344 @@ export function ChannelsPage() {
           </div>
         )}
 
-        {isEmpty ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center gap-3 p-12 text-center text-sm text-muted-foreground">
-              <MessageCircle className="h-8 w-8 opacity-50" />
-              <div>没有配置任何渠道</div>
-              <div className="max-w-md text-xs">
-                MVP 阶段配对流程走 openclaw 命令行。在终端运行：
-              </div>
-              <code className="rounded bg-muted px-3 py-2 font-mono text-[11px]">
-                openclaw channels add --type slack
-              </code>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => ipc.openExternal(OPENCLAW_CHANNELS_DOC)}
-              >
-                查看 OpenClaw 文档 <ExternalLink className="ml-1 h-3 w-3" />
-              </Button>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">已配置渠道（{channelCount}）</CardTitle>
-              <CardDescription>仅展示当前状态，修改需用 openclaw CLI</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ScrollArea className="max-h-96">
-                <div className="flex flex-col gap-2">
-                  {status?.channelOrder.map((cid) => (
-                    <div
-                      key={cid}
-                      data-testid="channel-row"
-                      data-channel-id={cid}
-                      className="flex items-center justify-between rounded-md border bg-card p-3"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium">
-                          {status.channelLabels[cid] ?? cid}
-                        </div>
-                        <div className="font-mono text-[10px] text-muted-foreground">{cid}</div>
-                        {status.channelDetailLabels?.[cid] && (
-                          <div className="mt-1 text-[11px] text-muted-foreground">
-                            {status.channelDetailLabels[cid]}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
-            </CardContent>
-          </Card>
+        {/* 国内 */}
+        <div>
+          <h2 className="mb-2 text-sm font-semibold text-muted-foreground">🇨🇳 国内常用</h2>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {cnChannels.map((def) => (
+              <ChannelCard
+                key={def.id}
+                def={def}
+                connected={!!connections[def.id]?.connected || !!connections['openclaw-weixin']?.connected}
+                detail={connections[def.id]?.detail}
+                onConnect={() => handleConnect(def)}
+                onDisconnect={() => handleDisconnect(def)}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* 国际 */}
+        <div>
+          <h2 className="mb-2 text-sm font-semibold text-muted-foreground">
+            <Globe2 className="mr-1 inline h-3.5 w-3.5" /> 国际（需梯子）
+          </h2>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {intlChannels.map((def) => (
+              <ChannelCard
+                key={def.id}
+                def={def}
+                connected={!!connections[def.id]?.connected}
+                detail={connections[def.id]?.detail}
+                onConnect={() => handleConnect(def)}
+                onDisconnect={() => handleDisconnect(def)}
+              />
+            ))}
+          </div>
+        </div>
+
+        {toast && (
+          <div className="fixed bottom-4 left-1/2 -translate-x-1/2 rounded-md border bg-card px-4 py-2 text-sm shadow-lg">
+            {toast}
+          </div>
         )}
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <TerminalIcon className="h-4 w-4" /> 添加渠道（CLI）
-            </CardTitle>
-            <CardDescription>
-              OpenClaw 支持 Slack / Discord / 飞书 / 钉钉 / Telegram / IMAP 等。每种走不同认证流程。
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2 text-xs">
-            <pre className="overflow-x-auto rounded bg-muted p-3 font-mono text-[11px] leading-relaxed">
-{`# Slack（需要 webhook URL）
-openclaw channels add --type slack
-
-# 飞书（需要应用 ID + Secret）
-openclaw channels add --type feishu
-
-# 邮件（IMAP + SMTP）
-openclaw channels add --type email
-
-# 查看已配置
-openclaw channels list`}
-            </pre>
-            <div className="text-muted-foreground">
-              配对完成后回到此页面，点右上「刷新」会看到。v1.1 计划内置 OAuth 流程。
-            </div>
-          </CardContent>
-        </Card>
       </div>
+
+      {dialog?.kind === 'form' && (
+        <FormDialog
+          def={dialog.channel}
+          onClose={() => setDialog(null)}
+          onDone={(msg) => {
+            setDialog(null)
+            showToast(msg)
+            void reload()
+          }}
+        />
+      )}
+
+      {dialog?.kind === 'progress' && (
+        <ProgressDialog
+          def={dialog.channel}
+          onClose={() => setDialog(null)}
+          onDone={(msg) => {
+            setDialog(null)
+            showToast(msg)
+            void reload()
+          }}
+        />
+      )}
     </div>
+  )
+}
+
+function ChannelCard({
+  def,
+  connected,
+  detail,
+  onConnect,
+  onDisconnect,
+}: {
+  def: ChannelDef
+  connected: boolean
+  detail?: string
+  onConnect: () => void
+  onDisconnect: () => void
+}) {
+  return (
+    <Card className="flex flex-col gap-2 p-3 text-xs" data-channel-id={def.id}>
+      <div className="flex items-start gap-2">
+        <div className="text-2xl leading-none">{def.emoji}</div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1 font-medium">
+            {def.name}
+            {connected && <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />}
+          </div>
+          <div className="mt-0.5 line-clamp-2 text-[10px] text-muted-foreground">{def.description}</div>
+          {def.caveat && (
+            <div className="mt-1 inline-flex items-center gap-0.5 rounded bg-amber-100 px-1.5 py-0.5 text-[9px] text-amber-800 dark:bg-amber-950 dark:text-amber-200">
+              <AlertTriangle className="h-2.5 w-2.5" /> {def.caveat}
+            </div>
+          )}
+        </div>
+      </div>
+      {connected && detail && (
+        <div className="rounded bg-muted/40 p-1.5 text-[10px] text-muted-foreground">{detail}</div>
+      )}
+      <div className="mt-auto border-t pt-2">
+        {connected ? (
+          <Button
+            size="sm"
+            variant="outline"
+            className="w-full border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
+            onClick={onDisconnect}
+          >
+            <Unplug className="mr-1 h-3 w-3" /> 断开
+          </Button>
+        ) : (
+          <Button size="sm" className="w-full" onClick={onConnect}>
+            <Plug className="mr-1 h-3 w-3" /> 连接
+          </Button>
+        )}
+      </div>
+    </Card>
+  )
+}
+
+// 表单 dialog（bot-token / bot-app-token 类型）
+function FormDialog({
+  def,
+  onClose,
+  onDone,
+}: {
+  def: ChannelDef
+  onClose: () => void
+  onDone: (msg: string) => void
+}) {
+  const [values, setValues] = useState<Record<string, string>>({})
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleSubmit = async () => {
+    setSubmitting(true)
+    setError(null)
+    try {
+      const opts: Record<string, string> = {}
+      for (const f of def.fields ?? []) {
+        const v = values[f.key]?.trim()
+        if (v) opts[f.key] = v
+      }
+      // 必填校验：除 name 外的字段都必填
+      for (const f of def.fields ?? []) {
+        if (f.key === 'name') continue
+        if (!opts[f.key]) {
+          setError(`${f.label} 不能为空`)
+          setSubmitting(false)
+          return
+        }
+      }
+      const r = await ipc.channelsAdd(def.id, opts)
+      if (r.ok) {
+        onDone(`${def.name} 配置已添加`)
+      } else {
+        setError(r.message || '添加失败')
+      }
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{def.emoji} 配置 {def.name}</DialogTitle>
+          <DialogDescription>{def.description}</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          {def.fields?.map((f) => (
+            <div key={f.key}>
+              <label className="mb-1 block text-xs font-medium">{f.label}</label>
+              <Input
+                type={f.type === 'password' ? 'password' : 'text'}
+                placeholder={f.placeholder}
+                value={values[f.key] || ''}
+                onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}
+                autoComplete="off"
+              />
+            </div>
+          ))}
+          {error && (
+            <div className="rounded-md border border-destructive/30 bg-destructive/10 px-2 py-1.5 text-xs text-destructive">
+              {error}
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>取消</Button>
+          <Button onClick={handleSubmit} disabled={submitting}>
+            {submitting && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+            添加配置
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// 长任务进度 dialog（plugin+qrcode / oauth-login）
+function ProgressDialog({
+  def,
+  onClose,
+  onDone,
+}: {
+  def: ChannelDef
+  onClose: () => void
+  onDone: (msg: string) => void
+}) {
+  const [lines, setLines] = useState<string[]>([])
+  const [stage, setStage] = useState<'starting' | 'installing' | 'logging-in' | 'done' | 'failed'>('starting')
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const startedRef = useRef(false)
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  // 实时滚到底部
+  useEffect(() => {
+    const el = scrollRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [lines])
+
+  const pushLine = (line: string) => {
+    setLines((prev) => [...prev, line])
+  }
+
+  useEffect(() => {
+    if (startedRef.current) return
+    startedRef.current = true
+
+    const unsub = ipc.channelsOnProgress((raw: unknown) => {
+      const p = raw as { stage: string; channel: string; source: string; line: string }
+      if (p.channel !== def.id && p.channel !== 'weixin' && p.channel !== 'openclaw-weixin') return
+      pushLine(p.line)
+    })
+
+    void (async () => {
+      try {
+        if (def.method === 'plugin+qrcode') {
+          // 微信：单步完成 — installer CLI 内置 plugin 安装 + 扫码登录两件事
+          // README 说装完会自动「引导扫码连接微信」，不要再单独 channels login
+          setStage('installing')
+          pushLine('=== 跑 npx @tencent-weixin/openclaw-weixin-cli install ===')
+          pushLine('（installer 会自动装 plugin → 引导扫码 → 重启 Gateway）')
+          pushLine('')
+          const installResult = await ipc.channelsInstallWeixin()
+          if (installResult.ok) {
+            setStage('done')
+            setTimeout(() => onDone('微信已连接 ✓'), 1500)
+          } else {
+            setStage('failed')
+            setErrorMsg(`installer 失败 (exit ${installResult.code})`)
+          }
+        } else if (def.method === 'oauth-login') {
+          // 飞书：直接 login，按提示完成 OAuth
+          setStage('logging-in')
+          pushLine(`=== openclaw channels login --channel ${def.id} --verbose ===`)
+          const r = await ipc.channelsLogin(def.id)
+          if (r.code === 0) {
+            setStage('done')
+            setTimeout(() => onDone(`${def.name} 已连接 ✓`), 1500)
+          } else {
+            setStage('failed')
+            setErrorMsg(`登录失败 (exit ${r.code})`)
+          }
+        }
+      } catch (e) {
+        setStage('failed')
+        setErrorMsg(e instanceof Error ? e.message : String(e))
+      }
+    })()
+
+    return () => unsub()
+  }, [def, onDone])
+
+  const stageLabel = {
+    starting: '准备中…',
+    installing: '正在安装 plugin（npm install）…',
+    'logging-in': stage === 'logging-in' && def.method === 'plugin+qrcode' ? '请用手机扫码登录' : '登录中…',
+    done: '已完成 ✓',
+    failed: '失败',
+  }[stage]
+
+  const copyOutput = async () => {
+    try {
+      await navigator.clipboard.writeText(lines.join('\n'))
+    } catch { /* */ }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && stage !== 'logging-in' && onClose()}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>{def.emoji} 连接 {def.name}</DialogTitle>
+          <DialogDescription>
+            {stage === 'failed' ? (
+              <span className="text-destructive">{stageLabel}</span>
+            ) : (
+              stageLabel
+            )}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-2">
+          {stage === 'logging-in' && def.method === 'plugin+qrcode' && (
+            <div className="rounded-md border border-blue-200 bg-blue-50 p-2 text-[11px] text-blue-800 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-200">
+              如果下方输出含二维码 ASCII（密集的 ██），请用手机微信「扫一扫」对准屏幕。
+            </div>
+          )}
+          <ScrollArea className="h-72 rounded-md border bg-black p-2 font-mono text-[10px] text-green-300" ref={scrollRef as never}>
+            <pre className="whitespace-pre-wrap">
+              {lines.length === 0 ? '等待输出…' : lines.join('\n')}
+            </pre>
+          </ScrollArea>
+          {errorMsg && (
+            <div className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">
+              {errorMsg}
+            </div>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={copyOutput} title="拷贝完整输出">
+            <Copy className="mr-1 h-3 w-3" /> 拷输出
+          </Button>
+          <Button
+            variant={stage === 'failed' || stage === 'done' ? 'default' : 'outline'}
+            onClick={onClose}
+            disabled={stage === 'installing'}
+          >
+            {stage === 'done' ? '关闭' : stage === 'failed' ? '关闭' : '取消'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
