@@ -126,21 +126,29 @@ export const openClaw = {
 
   /** 创建新会话（OpenClaw 称 'spawn'） */
   async spawnSession(params: { agentId?: string; channel?: string; peer?: string; label?: string }): Promise<{ sessionKey: string }> {
-    const result = await callRPCWithFallback<{ sessionKey?: string; key?: string }>(
-      ['sessions.spawn', 'session.spawn'],
-      [
-        {
-          ...(params.agentId ? { agentId: params.agentId } : {}),
-          ...(params.channel ? { channel: params.channel } : {}),
-          ...(params.peer ? { peer: params.peer } : {}),
-          ...(params.label ? { label: params.label } : {}),
-        },
-      ],
-    )
-    const sessionKey =
-      result?.sessionKey ||
-      result?.key ||
-      `agent:${params.agentId || 'main'}:${params.channel || 'main'}:dm:${params.peer || `web-${Date.now()}`}`
+    // OpenClaw 2026.4.21+ Gateway 不再暴露 sessions.spawn / session.spawn RPC。
+    // 但 sessionKey 本质就是 'agent:<agentId>:<channel>:dm:<peer>' 这种字符串格式 ——
+    // chat.send 用这个 key 时 OpenClaw 会自动创建对应 session。所以 RPC 失败时
+    // 直接构造 fallback key 返回。
+    const fallbackKey = `agent:${params.agentId || 'main'}:${params.channel || 'main'}:dm:${params.peer || `web-${Date.now()}`}`
+    let sessionKey = fallbackKey
+    try {
+      const result = await callRPCWithFallback<{ sessionKey?: string; key?: string }>(
+        ['sessions.spawn', 'session.spawn'],
+        [
+          {
+            ...(params.agentId ? { agentId: params.agentId } : {}),
+            ...(params.channel ? { channel: params.channel } : {}),
+            ...(params.peer ? { peer: params.peer } : {}),
+            ...(params.label ? { label: params.label } : {}),
+          },
+        ],
+      )
+      sessionKey = result?.sessionKey || result?.key || fallbackKey
+    } catch {
+      // RPC unknown method — 用 fallback，chat.send 第一次发会自动建 session
+      sessionKey = fallbackKey
+    }
     return { sessionKey }
   },
 

@@ -12,8 +12,14 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useSessionsStore, type SessionSummary } from '@/stores/sessions-store'
-import { useChatStore } from '@/stores/chat-store'
+import { useChatStore, type ChatMessage } from '@/stores/chat-store'
 import { useChatEngineStore } from '@/stores/chat-engine-store'
+import {
+  listHermesSessions,
+  getHermesSessionMessages,
+  deleteHermesSession,
+  type HermesSession,
+} from '@/services/hermes-api'
 import { cn } from '@/lib/utils'
 
 function formatRelativeTime(ts?: number) {
@@ -200,20 +206,97 @@ function OpenClawSessionList() {
 }
 
 /**
- * Hermes 模式的精简会话面板。
- * v1.1.1 不做完整 sessions 列表（列表在 /api/hermes/sessions 但 UI 暂不放，
- * 防止跟 OpenClaw 列表混淆）。只显示当前续接的 session_id + 新对话按钮。
+ * Hermes 模式的会话面板（Phase 16.3 完整版）。
+ * 列出 /api/hermes/sessions 全部历史，点击载入到对话页。
  */
 function HermesSessionPanel() {
   const hermesSessionId = useChatEngineStore((s) => s.hermesSessionId)
   const setHermesSessionId = useChatEngineStore((s) => s.setHermesSessionId)
   const setMessages = useChatStore((s) => s.setMessages)
+  const [sessions, setSessions] = useState<HermesSession[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [loadingSessionId, setLoadingSessionId] = useState<string | null>(null)
+
+  const reload = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const list = await listHermesSessions()
+      // 按 started_at 倒序（最新在前）
+      list.sort((a, b) => (b.started_at ?? 0) - (a.started_at ?? 0))
+      setSessions(list)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void reload()
+  }, [reload])
 
   const handleNewConversation = useCallback(() => {
     if (hermesSessionId && !window.confirm('新建对话会清空当前界面消息（Hermes 后端仍保留历史）。继续？')) return
     setHermesSessionId(null)
     setMessages([])
   }, [hermesSessionId, setHermesSessionId, setMessages])
+
+  const handleSelectSession = useCallback(
+    async (sessionId: string) => {
+      if (sessionId === hermesSessionId) return  // 已选中
+      setLoadingSessionId(sessionId)
+      try {
+        const msgs = await getHermesSessionMessages(sessionId)
+        // 转 ChatMessage：role/content/timestamp 直接映射
+        const chatMessages: ChatMessage[] = []
+        for (const raw of msgs) {
+          const m = raw as { id?: string; role?: string; content?: string | unknown[]; timestamp?: number | string }
+          const role = m.role
+          if (role !== 'user' && role !== 'assistant' && role !== 'system' && role !== 'tool') continue
+          const content = typeof m.content === 'string' ? m.content : ''
+          if (!content && role !== 'tool') continue
+          const ts = typeof m.timestamp === 'number'
+            ? new Date(m.timestamp * 1000).toISOString()
+            : typeof m.timestamp === 'string'
+              ? m.timestamp
+              : new Date().toISOString()
+          chatMessages.push({
+            id: m.id || `hermes-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            role,
+            content,
+            timestamp: ts,
+          })
+        }
+        setMessages(chatMessages)
+        setHermesSessionId(sessionId)
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e))
+      } finally {
+        setLoadingSessionId(null)
+      }
+    },
+    [hermesSessionId, setHermesSessionId, setMessages],
+  )
+
+  const handleDeleteSession = useCallback(
+    async (sessionId: string, ev: React.MouseEvent) => {
+      ev.stopPropagation()
+      if (!window.confirm(`删除这个 Hermes session？\n${sessionId.slice(0, 30)}...`)) return
+      try {
+        await deleteHermesSession(sessionId)
+        if (hermesSessionId === sessionId) {
+          setHermesSessionId(null)
+          setMessages([])
+        }
+        await reload()
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e))
+      }
+    },
+    [hermesSessionId, setHermesSessionId, setMessages, reload],
+  )
 
   return (
     <aside
@@ -222,37 +305,101 @@ function HermesSessionPanel() {
       className="flex h-full w-64 flex-col border-r bg-background"
     >
       <div className="flex items-center justify-between border-b px-3 py-2">
-        <div className="text-xs font-semibold">🪶 Hermes 模式</div>
-        <Button
-          size="icon"
-          variant="ghost"
-          className="h-6 w-6"
-          onClick={handleNewConversation}
-          aria-label="新对话"
-          data-testid="hermes-new"
-          title="新对话（清当前 session）"
-        >
-          <Plus className="h-3.5 w-3.5" />
-        </Button>
+        <div className="text-xs font-semibold">🪶 Hermes 会话</div>
+        <div className="flex items-center gap-1">
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-6 w-6"
+            onClick={reload}
+            disabled={loading}
+            aria-label="刷新"
+            data-testid="hermes-refresh"
+          >
+            <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin')} />
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-6 w-6"
+            onClick={handleNewConversation}
+            aria-label="新对话"
+            data-testid="hermes-new"
+            title="新对话（清当前 session）"
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </Button>
+        </div>
       </div>
-      <div className="space-y-2 p-3 text-[11px]">
-        <div className="rounded-md bg-muted/40 p-2 text-muted-foreground">
-          {hermesSessionId ? (
-            <>
-              <div className="text-foreground">当前 session</div>
-              <div className="mt-1 break-all font-mono text-[10px]">{hermesSessionId}</div>
-              <div className="mt-1 text-[10px]">下条消息会续接到此对话</div>
-            </>
-          ) : (
-            <>
-              <div className="text-foreground">暂无 session</div>
-              <div className="mt-0.5 text-[10px]">发条消息开始一个新对话，Hermes 会自动建 session</div>
-            </>
+
+      {error && (
+        <div className="border-b border-destructive/30 bg-destructive/10 px-3 py-1.5 text-[11px] text-destructive">
+          {error}
+        </div>
+      )}
+
+      <ScrollArea className="flex-1">
+        <div className="flex flex-col gap-1 p-2">
+          {sessions.length === 0 && !loading && (
+            <div className="px-2 py-4 text-center text-[11px] text-muted-foreground">
+              暂无历史会话<br />发条消息开始
+            </div>
           )}
+          {sessions.map((s) => {
+            const active = s.id === hermesSessionId
+            const isLoading = s.id === loadingSessionId
+            const ts = typeof s.started_at === 'number' ? s.started_at * 1000 : 0
+            return (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => handleSelectSession(s.id)}
+                data-testid="hermes-session-row"
+                data-session-id={s.id}
+                className={cn(
+                  'group flex w-full flex-col gap-0.5 rounded-md border px-2 py-1.5 text-left transition-colors',
+                  active
+                    ? 'border-primary bg-primary/5'
+                    : 'border-transparent hover:bg-accent',
+                )}
+              >
+                <div className="flex items-center justify-between gap-1">
+                  <span className="truncate font-mono text-[10px]">
+                    {s.id.slice(0, 24)}…
+                  </span>
+                  <span className="flex items-center gap-1">
+                    {isLoading && <RefreshCw className="h-2.5 w-2.5 animate-spin text-muted-foreground" />}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          onClick={(e) => e.stopPropagation()}
+                          className="opacity-0 group-hover:opacity-100"
+                          aria-label="更多"
+                        >
+                          <MoreVertical className="h-3 w-3" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={(e) => handleDeleteSession(s.id, e as never)}>
+                          <Trash2 className="mr-1 h-3 w-3" /> 删除 session
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-[9px] text-muted-foreground">
+                  <span>{s.message_count ?? 0} 条 · {s.model ?? 'unknown'}</span>
+                  <span>{ts ? formatRelativeTime(ts) : ''}</span>
+                </div>
+              </button>
+            )
+          })}
         </div>
-        <div className="rounded-md border border-dashed p-2 text-[10px] text-muted-foreground">
-          切回 OpenClaw 引擎可看完整会话列表。Cron / 技能商城 / 通信渠道仍走 OpenClaw。
-        </div>
+      </ScrollArea>
+
+      <div className="border-t p-2 text-[10px] text-muted-foreground">
+        切回 OpenClaw 看完整会话列表。Cron/Skills/Channels 仍走 OpenClaw。
       </div>
     </aside>
   )
