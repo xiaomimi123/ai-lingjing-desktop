@@ -167,6 +167,8 @@ export function useChat() {
         } else {
           // Hermes 分支：把当前 store 已有 messages 转成 input 数组 + 当前消息
           // 走 sendHermesMessage 自己管 SSE，onDelta 实时 append 到最后一条 assistant
+          // 续接对话：传 hermesSessionId 让 Hermes 关联到现有 session
+          const engineStore = useChatEngineStore.getState()
           const history = useChatStore.getState().messages
           const input: HermesRunMessage[] = []
           for (const m of history) {
@@ -178,7 +180,8 @@ export function useChat() {
           }
 
           let accumulated = ''
-          await sendHermesMessage(input, {
+          const result = await sendHermesMessage(input, {
+            sessionId: engineStore.hermesSessionId || undefined,
             onDelta: (_chunk, accu) => {
               accumulated = accu
               // 替换最后一条 assistant 内容
@@ -191,6 +194,10 @@ export function useChat() {
               })
             },
           })
+          // 首次 send 创建的 sessionId 存 store 给下一轮续接
+          if (!engineStore.hermesSessionId && result.sessionId) {
+            engineStore.setHermesSessionId(result.sessionId)
+          }
           // 结束：finalize
           useChatStore.setState((s) => {
             const msgs = s.messages

@@ -12,14 +12,19 @@ export type ChatEngine = 'openclaw' | 'hermes'
 
 interface State {
   engine: ChatEngine
+  /** Hermes 当前对话的 session_id（=首次创建时的 run_id）。续接对话时传给 POST /v1/runs */
+  hermesSessionId: string | null
   setEngine: (e: ChatEngine) => void
+  setHermesSessionId: (id: string | null) => void
 }
 
 export const useChatEngineStore = create<State>()(
   persist(
     (set) => ({
       engine: 'openclaw',
+      hermesSessionId: null,
       setEngine: (engine) => set({ engine }),
+      setHermesSessionId: (hermesSessionId) => set({ hermesSessionId }),
     }),
     { name: 'lingjing-chat-engine' },
   ),

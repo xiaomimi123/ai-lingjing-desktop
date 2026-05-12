@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useSessionsStore, type SessionSummary } from '@/stores/sessions-store'
 import { useChatStore } from '@/stores/chat-store'
+import { useChatEngineStore } from '@/stores/chat-engine-store'
 import { cn } from '@/lib/utils'
 
 function formatRelativeTime(ts?: number) {
@@ -91,6 +92,13 @@ function SessionItem({
 }
 
 export function SessionList() {
+  const engine = useChatEngineStore((s) => s.engine)
+  // Hermes 模式：用简化面板替代 OpenClaw 完整列表
+  if (engine === 'hermes') return <HermesSessionPanel />
+  return <OpenClawSessionList />
+}
+
+function OpenClawSessionList() {
   const { sessions, loading, error, fetch, create, remove, reset } = useSessionsStore()
   const activeKey = useChatStore((s) => s.sessionKey)
   const setSessionKey = useChatStore((s) => s.setSessionKey)
@@ -187,6 +195,65 @@ export function SessionList() {
           ))}
         </div>
       </ScrollArea>
+    </aside>
+  )
+}
+
+/**
+ * Hermes 模式的精简会话面板。
+ * v1.1.1 不做完整 sessions 列表（列表在 /api/hermes/sessions 但 UI 暂不放，
+ * 防止跟 OpenClaw 列表混淆）。只显示当前续接的 session_id + 新对话按钮。
+ */
+function HermesSessionPanel() {
+  const hermesSessionId = useChatEngineStore((s) => s.hermesSessionId)
+  const setHermesSessionId = useChatEngineStore((s) => s.setHermesSessionId)
+  const setMessages = useChatStore((s) => s.setMessages)
+
+  const handleNewConversation = useCallback(() => {
+    if (hermesSessionId && !window.confirm('新建对话会清空当前界面消息（Hermes 后端仍保留历史）。继续？')) return
+    setHermesSessionId(null)
+    setMessages([])
+  }, [hermesSessionId, setHermesSessionId, setMessages])
+
+  return (
+    <aside
+      data-testid="session-list"
+      data-engine="hermes"
+      className="flex h-full w-64 flex-col border-r bg-background"
+    >
+      <div className="flex items-center justify-between border-b px-3 py-2">
+        <div className="text-xs font-semibold">🪶 Hermes 模式</div>
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-6 w-6"
+          onClick={handleNewConversation}
+          aria-label="新对话"
+          data-testid="hermes-new"
+          title="新对话（清当前 session）"
+        >
+          <Plus className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+      <div className="space-y-2 p-3 text-[11px]">
+        <div className="rounded-md bg-muted/40 p-2 text-muted-foreground">
+          {hermesSessionId ? (
+            <>
+              <div className="text-foreground">当前 session</div>
+              <div className="mt-1 break-all font-mono text-[10px]">{hermesSessionId}</div>
+              <div className="mt-1 text-[10px]">下条消息会续接到此对话</div>
+            </>
+          ) : (
+            <>
+              <div className="text-foreground">暂无 session</div>
+              <div className="mt-0.5 text-[10px]">发条消息开始一个新对话，Hermes 会自动建 session</div>
+            </>
+          )}
+        </div>
+        <div className="rounded-md border border-dashed p-2 text-[10px] text-muted-foreground">
+          切回 OpenClaw 引擎可看完整会话列表。Cron / 技能商城 / 通信渠道仍走 OpenClaw。
+        </div>
+      </div>
     </aside>
   )
 }

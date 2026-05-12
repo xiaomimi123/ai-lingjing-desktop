@@ -84,7 +84,7 @@ export async function sendHermesMessage(
     onReasoning?: (text: string) => void
     signal?: AbortSignal
   } = {},
-): Promise<{ runId: string; finalText: string; usage?: { input_tokens?: number; output_tokens?: number; total_tokens?: number } }> {
+): Promise<{ runId: string; sessionId: string; finalText: string; usage?: { input_tokens?: number; output_tokens?: number; total_tokens?: number } }> {
   const body: Record<string, unknown> = { input: messages }
   if (opts.model) body.model = opts.model
   if (opts.sessionId) body.session_id = opts.sessionId
@@ -150,5 +150,8 @@ export async function sendHermesMessage(
     }
   }
 
-  return { runId, finalText: accumulated, usage }
+  // 首次 send（无 opts.sessionId）时 Hermes 创建新 session，session_id == run_id
+  // 续接 send（有 opts.sessionId）时返回的 run_id 是新的，但 session 仍是传入的 sessionId
+  const sessionId = opts.sessionId || runId
+  return { runId, sessionId, finalText: accumulated, usage }
 }
