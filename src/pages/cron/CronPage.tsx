@@ -20,7 +20,6 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
@@ -141,54 +140,64 @@ export function CronPage() {
   return (
     <div className="h-full overflow-auto">
       <div className="mx-auto max-w-5xl space-y-4 p-6">
-        <div className="flex items-start justify-between">
+        <div className="flex items-start justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold">定时任务</h1>
-            <p className="text-sm text-muted-foreground">
+            <h1 className="text-lg font-semibold">定时任务</h1>
+            <p className="mt-0.5 text-xs text-muted-foreground">
               让 Agent 按计划自动跑：每天 9 点整理下载、每周五自动生成周报…
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <Button size="sm" variant="outline" onClick={reload} disabled={loading}>
-              <RefreshCw className={loading ? 'mr-1 h-3.5 w-3.5 animate-spin' : 'mr-1 h-3.5 w-3.5'} />
-              刷新
+          <div className="flex items-center gap-1">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8 text-muted-foreground"
+              onClick={reload}
+              disabled={loading}
+              title="刷新"
+              data-testid="cron-refresh"
+            >
+              <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin')} strokeWidth={1.5} />
             </Button>
             <Button size="sm" onClick={() => setOpening(true)} data-testid="cron-add">
-              <Plus className="mr-1 h-3.5 w-3.5" /> 新建
+              <Plus className="mr-1 h-3.5 w-3.5" strokeWidth={1.5} /> 新建
             </Button>
           </div>
         </div>
 
-        {/* Cron 服务状态 */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Power className={status?.enabled ? 'h-4 w-4 text-emerald-500' : 'h-4 w-4 text-muted-foreground'} />
-              Cron 服务
-            </CardTitle>
-            <CardDescription>
-              {status?.enabled ? '已启用，按计划自动唤醒任务' : '未启用，所有任务不会自动跑'}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-2 text-xs sm:grid-cols-3">
+        {/* Cron 服务状态 — 紧凑版 */}
+        <div className="flex items-center gap-4 rounded-lg border bg-card px-4 py-3 text-xs">
+          <div className="flex items-center gap-2">
+            <span
+              className={cn(
+                'flex h-7 w-7 items-center justify-center rounded-full',
+                status?.enabled ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-muted text-muted-foreground',
+              )}
+            >
+              <Power className="h-3.5 w-3.5" strokeWidth={1.75} />
+            </span>
             <div>
-              <div className="text-muted-foreground">任务数</div>
-              <div className="font-mono text-base">{status?.jobs ?? 0}</div>
+              <div className="text-[11px] font-medium">
+                Cron 服务 · {status?.enabled ? '已启用' : '未启用'}
+              </div>
+              <div className="text-[10px] text-muted-foreground">
+                {status?.enabled ? '按计划自动唤醒任务' : '任务不会自动跑'}
+              </div>
             </div>
-            <div>
-              <div className="text-muted-foreground">下一次唤醒</div>
-              <div className="font-mono text-base">
+          </div>
+          <div className="ml-auto flex items-center gap-5">
+            <div className="text-right">
+              <div className="text-[10px] text-muted-foreground">任务数</div>
+              <div className="font-mono text-sm">{status?.jobs ?? 0}</div>
+            </div>
+            <div className="text-right">
+              <div className="text-[10px] text-muted-foreground">下一次唤醒</div>
+              <div className="font-mono text-sm">
                 {status?.nextWakeAtMs ? fmtTime(status.nextWakeAtMs) : '—'}
               </div>
             </div>
-            <div>
-              <div className="text-muted-foreground">存储</div>
-              <div className="truncate font-mono text-[10px]" title={status?.storePath}>
-                {status?.storePath ?? '—'}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
         {(error || toast) && (
           <div
@@ -204,37 +213,57 @@ export function CronPage() {
 
         {/* 任务列表 */}
         {jobs.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center gap-2 p-12 text-center text-sm text-muted-foreground">
-              <AlarmClock className="h-8 w-8 opacity-50" />
-              <div>没有定时任务</div>
-              <div className="text-xs">点右上「新建」让 Agent 按计划干活</div>
-            </CardContent>
-          </Card>
+          <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed bg-card p-12 text-center text-sm text-muted-foreground">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+              <AlarmClock className="h-6 w-6 text-muted-foreground/60" strokeWidth={1.5} />
+            </div>
+            <div className="font-medium text-foreground">没有定时任务</div>
+            <div className="text-xs">点右上「新建」让 Agent 按计划干活</div>
+          </div>
         ) : (
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1.5">
             {jobs.map((j) => (
-              <Card key={j.id} data-testid="cron-job" data-job-id={j.id} className="flex flex-row items-center gap-3 p-3">
-                <div className="flex-1 min-w-0">
+              <div
+                key={j.id}
+                data-testid="cron-job"
+                data-job-id={j.id}
+                className="group flex items-center gap-3 rounded-lg border bg-card px-3.5 py-2.5 transition-colors hover:border-primary/40 hover:bg-accent/30"
+              >
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                  <AlarmClock className="h-4 w-4" strokeWidth={1.5} />
+                </span>
+                <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">{j.name}</span>
+                    <span className="truncate text-sm font-medium">{j.name}</span>
                     <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
                       {j.schedule}
                     </code>
                   </div>
-                  <div className="mt-1 flex flex-wrap gap-3 text-[11px] text-muted-foreground">
-                    <span>目标 {j.sessionTarget ?? '—'}</span>
+                  <div className="mt-0.5 flex flex-wrap gap-x-3 text-[11px] text-muted-foreground">
+                    <span className="truncate">目标 {j.sessionTarget ?? '—'}</span>
                     {j.lastRunAt && <span>· 上次 {fmtTime(j.lastRunAt)}</span>}
                     {j.nextRunAt && <span>· 下次 {fmtTime(j.nextRunAt)}</span>}
                   </div>
                 </div>
-                <Button size="sm" variant="ghost" onClick={() => handleRun(j.id)} data-testid="cron-run">
-                  <Play className="mr-1 h-3 w-3" /> 立即跑
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-2 text-xs"
+                  onClick={() => handleRun(j.id)}
+                  data-testid="cron-run"
+                >
+                  <Play className="mr-1 h-3 w-3" strokeWidth={1.5} /> 立即跑
                 </Button>
-                <Button size="icon" variant="ghost" onClick={() => handleRemove(j)} className="text-destructive">
-                  <Trash2 className="h-3.5 w-3.5" />
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => handleRemove(j)}
+                  className="h-7 w-7 text-muted-foreground opacity-60 hover:text-destructive group-hover:opacity-100"
+                  title="删除"
+                >
+                  <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
                 </Button>
-              </Card>
+              </div>
             ))}
           </div>
         )}
