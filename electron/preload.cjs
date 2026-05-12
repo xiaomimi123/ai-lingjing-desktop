@@ -57,6 +57,19 @@ contextBridge.exposeInMainWorld('lingjing', {
   clawhubSetUrl: (url) => ipcRenderer.invoke('lingjing:clawhub-set-url', { url }),
   clawhubPing: (urls) => ipcRenderer.invoke('lingjing:clawhub-ping', { urls }),
   /**
+   * Bundled runtime（Phase 14.3+）。首启下载 Node + OpenClaw 到 userData/runtime/
+   * runtimeStatus → 查当前状态（已装 / 缺）
+   * runtimeEnsureNode → 触发下载 + 解压
+   * runtimeOnProgress(cb) → 订阅进度事件流，返回 unsubscribe
+   */
+  runtimeStatus: () => ipcRenderer.invoke('lingjing:runtime-status'),
+  runtimeEnsureNode: () => ipcRenderer.invoke('lingjing:runtime-ensure-node'),
+  runtimeOnProgress: (cb) => {
+    const listener = (_evt, payload) => cb(payload)
+    ipcRenderer.on('lingjing:runtime-progress', listener)
+    return () => ipcRenderer.off('lingjing:runtime-progress', listener)
+  },
+  /**
    * 系统原生文件/文件夹选择器，Phase 5 任务执行的路径参数用。
    * selectFile/selectFolder 返回 { ok, canceled, paths: string[] }；
    * saveFile 返回 { ok, canceled, path: string|null }。

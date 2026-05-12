@@ -127,6 +127,30 @@ export const ipc = {
     return window.lingjing.clawhubPing(urls)
   },
 
+  runtimeStatus() {
+    if (!window.lingjing) {
+      return Promise.resolve(notInElectron({
+        ok: false,
+        targetNodeVersion: '',
+        node: { ready: false, reason: 'not-in-electron' },
+        runtimeRoot: '',
+      }))
+    }
+    return window.lingjing.runtimeStatus()
+  },
+
+  runtimeEnsureNode() {
+    if (!window.lingjing) {
+      return Promise.resolve(notInElectron({ ok: false, error: 'not-in-electron' }))
+    }
+    return window.lingjing.runtimeEnsureNode()
+  },
+
+  runtimeOnProgress(cb: (p: unknown) => void): () => void {
+    if (!window.lingjing) return () => {}
+    return window.lingjing.runtimeOnProgress(cb as never)
+  },
+
   selectFile(opts?: SelectFileOptions): Promise<SelectResult> {
     if (!window.lingjing) {
       // 浏览器环境兜底：用 <input type="file"> 弹原生选择器

@@ -101,11 +101,41 @@ export interface LingjingPreload {
   clawhubGetUrl(): Promise<{ ok: boolean; url: string; mirror: string }>
   clawhubSetUrl(url: string): Promise<{ ok: boolean; url?: string; message?: string }>
   clawhubPing(urls?: string[]): Promise<{ ok: boolean; results: Array<{ url: string; ok: boolean; status?: number; ms: number; message?: string }> }>
+  runtimeStatus(): Promise<{
+    ok: boolean
+    targetNodeVersion: string
+    node: { ready: boolean; version?: string; path?: string; reason?: string; error?: string }
+    runtimeRoot: string
+  }>
+  runtimeEnsureNode(): Promise<{
+    ok: boolean
+    cached?: boolean
+    version?: string
+    path?: string
+    error?: string
+    message?: string
+  }>
+  runtimeOnProgress(cb: (progress: RuntimeProgress) => void): () => void
   selectFile(opts?: SelectFileOptions): Promise<SelectResult>
   selectFolder(opts?: SelectFolderOptions): Promise<SelectResult>
   saveFile(opts?: SaveFileOptions): Promise<SaveResult>
   showInFolder(path: string): Promise<{ ok: boolean; message?: string }>
   readTextFile(path: string): Promise<{ ok: boolean; content?: string; message?: string }>
+}
+
+export interface RuntimeProgress {
+  component: 'node' | 'openclaw'
+  stage: 'check' | 'download' | 'download-failed' | 'extract' | 'verify' | 'done' | 'error'
+  source?: string
+  url?: string
+  percent?: number
+  downloaded?: number
+  total?: number
+  speedBytesPerSec?: number
+  filename?: string
+  cached?: boolean
+  version?: string
+  error?: string
 }
 
 declare global {

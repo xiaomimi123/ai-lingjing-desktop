@@ -6,6 +6,7 @@ import { promises as fs, accessSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { nodeBinCandidates, openclawBinCandidates, hermesBinCandidates, buildChildPath, IS_WIN } from './platform.js'
+import { ensureBundledNode, isBundledNodeReady, NODE_VERSION } from './runtime-installer.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -679,6 +680,33 @@ ipcMain.handle('lingjing:clawhub-ping', async (_event, params) => {
     }
   }))
   return { ok: true, results }
+})
+
+// ============================================================================
+// Runtime 安装器（Phase 14.3）— 首启下载 Node 二进制到 userData/runtime/
+// ============================================================================
+
+ipcMain.handle('lingjing:runtime-status', async () => {
+  const userData = app.getPath('userData')
+  const node = await isBundledNodeReady(userData)
+  return {
+    ok: true,
+    targetNodeVersion: NODE_VERSION,
+    node,
+    runtimeRoot: path.join(userData, 'runtime'),
+  }
+})
+
+// 长任务：webContents.send 推 progress 给所有窗口。前端订阅 'lingjing:runtime-progress'
+ipcMain.handle('lingjing:runtime-ensure-node', async () => {
+  const userData = app.getPath('userData')
+  const result = await ensureBundledNode(userData, (progress) => {
+    // 全窗口广播（welcome / main 都可能在听）
+    for (const win of BrowserWindow.getAllWindows()) {
+      win.webContents.send('lingjing:runtime-progress', { component: 'node', ...progress })
+    }
+  })
+  return result
 })
 
 ipcMain.handle('lingjing:open-external', async (_event, url) => {
