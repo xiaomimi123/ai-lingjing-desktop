@@ -149,7 +149,7 @@ function OpenClawSessionList() {
       className="flex h-full w-64 flex-col border-r bg-background"
     >
       <div className="flex items-center justify-between border-b px-3 py-2">
-        <div className="text-xs font-semibold">会话</div>
+        <div className="text-xs font-semibold">OpenClaw 会话</div>
         <div className="flex items-center gap-1">
           <Button
             size="icon"

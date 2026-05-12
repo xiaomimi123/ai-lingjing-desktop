@@ -45,10 +45,11 @@ SyntaxHighlighter.registerLanguage('rust', rust)
 SyntaxHighlighter.registerLanguage('rs', rust)
 SyntaxHighlighter.registerLanguage('css', css)
 SyntaxHighlighter.registerLanguage('diff', diff)
-import { Bot, User, Check, Copy } from 'lucide-react'
+import { Check, Copy } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useTheme } from '@/hooks/useTheme'
+import { useProductStore } from '@/stores/product-store'
 import type { ChatMessage as ChatMessageType } from '@/stores/chat-store'
 
 interface ChatMessageProps {
@@ -81,33 +82,44 @@ function CopyButton({ text }: { text: string }) {
 
 export function ChatMessage({ message }: ChatMessageProps) {
   const { isDark } = useTheme()
+  const product = useProductStore((s) => s.product)
   const isUser = message.role === 'user'
+  // assistant 头像跟左侧 Sidebar 一级产品 logo 保持一致（openclaw / hermes 各自官方 SVG）
+  const productLogoSrc = product === 'hermes' ? '/hermes-logo.svg' : '/openclaw-logo.svg'
+  const productLabel = product === 'hermes' ? 'Hermes' : 'OpenClaw'
 
   return (
     <div
       data-testid="chat-message"
       data-role={message.role}
       className={cn(
-        'flex gap-3 px-4 py-3',
+        'flex gap-3 px-4 py-2.5',
         isUser ? 'flex-row-reverse' : 'flex-row',
       )}
     >
-      {/* Avatar */}
-      <div
-        className={cn(
-          'flex h-7 w-7 shrink-0 items-center justify-center rounded-full border',
-          isUser ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground',
-        )}
-      >
-        {isUser ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
-      </div>
+      {/* Assistant 头像用当前产品 logo，User 不显示头像 */}
+      {!isUser && (
+        <div
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border bg-background"
+          title={`${productLabel} Assistant`}
+        >
+          <img
+            src={productLogoSrc}
+            alt={productLabel}
+            className="h-5 w-5"
+            draggable={false}
+          />
+        </div>
+      )}
 
       {/* Body */}
-      <div className={cn('flex max-w-[80%] flex-col gap-1', isUser ? 'items-end' : 'items-start')}>
+      <div className={cn('flex max-w-[78%] flex-col gap-1', isUser ? 'items-end' : 'items-start')}>
         <div
           className={cn(
             'prose prose-sm dark:prose-invert max-w-full break-words',
-            isUser ? 'text-right' : 'text-left',
+            isUser
+              ? 'rounded-2xl rounded-tr-sm bg-primary/10 px-3.5 py-2 text-left text-foreground'
+              : 'text-left',
           )}
         >
           <ReactMarkdown

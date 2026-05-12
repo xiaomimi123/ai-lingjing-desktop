@@ -2,9 +2,10 @@
 // 顶栏显示当前会话 Key（只读 + 复制按钮） + 拉历史 / 清空 / SSE 连接指示。
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Copy, Check, RefreshCw, Trash2, Wifi, WifiOff } from 'lucide-react'
+import { Copy, Check, RefreshCw, Trash2, MessageCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useChat } from '@/hooks/useChat'
 import { ChatMessage } from '@/components/chat/ChatMessage'
 import { ChatInput } from '@/components/chat/ChatInput'
@@ -57,114 +58,149 @@ export function ChatPage() {
   }, [sessionKey])
 
   return (
-    <div className="flex h-full">
-      <SessionList />
+    <TooltipProvider delayDuration={200}>
+      <div className="flex h-full">
+        <SessionList />
 
-      <div className="flex flex-1 flex-col overflow-hidden">
-        {/* 顶部条 */}
-        <div className="flex items-center gap-2 border-b bg-background px-4 py-2">
-          {sessionKey ? (
-            <>
-              <span className="text-xs font-medium text-muted-foreground">当前会话</span>
-              <span
-                data-testid="chat-active-session"
-                className="font-mono text-xs text-foreground"
-                title={sessionKey}
-              >
-                {shortenKey(sessionKey)}
-              </span>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-6 w-6"
-                onClick={handleCopy}
-                aria-label="复制会话 Key"
-                data-testid="chat-copy-session-key"
-              >
-                {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-              </Button>
-            </>
-          ) : (
-            <span className="text-xs text-muted-foreground">未选会话，请在左侧新建或选择一个</span>
-          )}
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={fetchHistory}
-            disabled={!sessionKey || sending}
-            data-testid="chat-fetch-history"
-            className="ml-auto"
-          >
-            <RefreshCw className="mr-1 h-3.5 w-3.5" /> 拉历史
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={clear}
-            disabled={messages.length === 0}
-            data-testid="chat-clear"
-          >
-            <Trash2 className="mr-1 h-3.5 w-3.5" /> 清空本地
-          </Button>
-          <div
-            className={cn(
-              'flex items-center gap-1 text-[11px]',
-              sseConnected ? 'text-emerald-600' : 'text-muted-foreground',
-            )}
-            title="SSE 连接状态"
-            data-testid="chat-sse-status"
-            data-connected={sseConnected || undefined}
-          >
-            {sseConnected ? (
+        <div className="flex flex-1 flex-col overflow-hidden">
+          {/* 顶部条：紧凑 — 会话 key + 复制 + 右侧 icon-only 操作 + SSE dot */}
+          <div className="flex h-10 items-center gap-2 border-b bg-background px-4">
+            {sessionKey ? (
               <>
-                <Wifi className="h-3.5 w-3.5" />
-                <span>事件流</span>
+                <span
+                  data-testid="chat-active-session"
+                  className="truncate font-mono text-[11px] text-muted-foreground"
+                  title={sessionKey}
+                >
+                  {shortenKey(sessionKey)}
+                </span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-6 w-6 text-muted-foreground"
+                      onClick={handleCopy}
+                      aria-label="复制会话 Key"
+                      data-testid="chat-copy-session-key"
+                    >
+                      {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="text-[11px]">复制会话 Key</TooltipContent>
+                </Tooltip>
               </>
             ) : (
-              <>
-                <WifiOff className="h-3.5 w-3.5" />
-                <span>断开</span>
-              </>
+              <span className="text-xs text-muted-foreground">未选会话，请在左侧新建或选择</span>
             )}
-          </div>
-        </div>
 
-        {/* 错误条 */}
-        {error && (
-          <div
-            data-testid="chat-error"
-            className="flex items-center justify-between border-b border-destructive/30 bg-destructive/10 px-4 py-1.5 text-xs text-destructive"
-          >
-            <span>{error}</span>
-            <Button size="sm" variant="ghost" onClick={() => setError(null)}>
-              关闭
-            </Button>
-          </div>
-        )}
+            {/* 右侧操作组 */}
+            <div className="ml-auto flex items-center gap-1">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-6 w-6 text-muted-foreground"
+                    onClick={fetchHistory}
+                    disabled={!sessionKey || sending}
+                    data-testid="chat-fetch-history"
+                    aria-label="拉历史"
+                  >
+                    <RefreshCw className={cn('h-3.5 w-3.5', sending && 'animate-spin')} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-[11px]">从云端拉取历史消息</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-6 w-6 text-muted-foreground"
+                    onClick={clear}
+                    disabled={messages.length === 0}
+                    data-testid="chat-clear"
+                    aria-label="清空本地消息"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-[11px]">清空本地消息（不动云端历史）</TooltipContent>
+              </Tooltip>
 
-        {/* 消息流 */}
-        <ScrollArea className="flex-1" data-testid="chat-history">
-          {messages.length === 0 ? (
-            <div className="flex h-full min-h-[200px] flex-col items-center justify-center gap-2 text-center text-sm text-muted-foreground">
-              {sessionKey ? (
-                <div>会话内还没有消息。在下方开始对话。</div>
-              ) : (
-                <div>左侧选一个会话，或点 + 新建。</div>
-              )}
+              {/* SSE 状态用圆点替代 Wifi/WifiOff + 文字 */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div
+                    className="flex h-6 w-6 items-center justify-center"
+                    data-testid="chat-sse-status"
+                    data-connected={sseConnected || undefined}
+                    aria-label={sseConnected ? '事件流已连接' : '事件流断开'}
+                  >
+                    <span
+                      className={cn(
+                        'h-2 w-2 rounded-full transition-colors',
+                        sseConnected ? 'bg-emerald-500 shadow-[0_0_6px] shadow-emerald-500/50' : 'bg-muted-foreground/40',
+                      )}
+                    />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-[11px]">
+                  {sseConnected ? '事件流已连接' : '事件流断开 — 重连中…'}
+                </TooltipContent>
+              </Tooltip>
             </div>
-          ) : (
-            <div className="flex flex-col">
-              {messages.map((m) => (
-                <ChatMessage key={m.id} message={m} />
-              ))}
-              <div ref={bottomRef} />
+          </div>
+
+          {/* 错误条 */}
+          {error && (
+            <div
+              data-testid="chat-error"
+              className="flex items-center justify-between border-b border-destructive/30 bg-destructive/10 px-4 py-1.5 text-xs text-destructive"
+            >
+              <span>{error}</span>
+              <Button size="sm" variant="ghost" className="h-6" onClick={() => setError(null)}>
+                关闭
+              </Button>
             </div>
           )}
-        </ScrollArea>
 
-        {/* 输入 */}
-        <ChatInput onSend={send} onAbort={abort} sending={sending} disabled={!sessionKey} />
+          {/* 消息流 */}
+          <ScrollArea className="flex-1" data-testid="chat-history">
+            {messages.length === 0 ? (
+              <div className="flex h-full min-h-[300px] flex-col items-center justify-center gap-3 text-center text-sm text-muted-foreground">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+                  <MessageCircle className="h-6 w-6 text-muted-foreground/60" strokeWidth={1.5} />
+                </div>
+                <div className="max-w-xs">
+                  {sessionKey ? (
+                    <>
+                      <div className="font-medium text-foreground">开始一段对话</div>
+                      <div className="mt-1 text-xs">在下方输入消息，Enter 发送</div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="font-medium text-foreground">未选会话</div>
+                      <div className="mt-1 text-xs">左侧选一条历史会话，或点 + 新建</div>
+                    </>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col">
+                {messages.map((m) => (
+                  <ChatMessage key={m.id} message={m} />
+                ))}
+                <div ref={bottomRef} />
+              </div>
+            )}
+          </ScrollArea>
+
+          {/* 输入 */}
+          <ChatInput onSend={send} onAbort={abort} sending={sending} disabled={!sessionKey} />
+        </div>
       </div>
-    </div>
+    </TooltipProvider>
   )
 }
