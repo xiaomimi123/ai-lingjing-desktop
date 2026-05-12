@@ -25,7 +25,7 @@ import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { ipc } from '@/services/ipc'
-import { getChannelsStatus, type ChannelsStatus } from '@/services/channels-api'
+import { getChannelsStatus, type ChannelsStatus, type ChannelRuntimeState } from '@/services/channels-api'
 
 type ConnectMethod = 'plugin+qrcode' | 'oauth-login' | 'bot-token' | 'bot-app-token'
 
@@ -119,8 +119,27 @@ const CHANNEL_DEFS: ChannelDef[] = [
 ]
 
 interface ConnectionState {
-  // channel id → 当前是否已连
-  [channelId: string]: { connected: boolean; account?: string; detail?: string }
+  // channel id → 当前是否已连 + 详细 runtime 状态
+  [channelId: string]: {
+    connected: boolean
+    account?: string
+    detail?: string
+    lastError?: string | null
+    lastInboundAt?: number | string | null
+    lastOutboundAt?: number | string | null
+  }
+}
+
+// 格式化 lastInbound/Outbound 时间戳
+function formatRelTime(ts: number | string | null | undefined): string | null {
+  if (!ts) return null
+  const ms = typeof ts === 'number' ? ts : Date.parse(ts as string)
+  if (!Number.isFinite(ms)) return null
+  const delta = Date.now() - ms
+  if (delta < 60_000) return '刚刚'
+  if (delta < 3_600_000) return `${Math.floor(delta / 60_000)} 分钟前`
+  if (delta < 86_400_000) return `${Math.floor(delta / 3_600_000)} 小时前`
+  return `${Math.floor(delta / 86_400_000)} 天前`
 }
 
 export function ChannelsPage() {
@@ -137,12 +156,17 @@ export function ChannelsPage() {
     try {
       const s = await getChannelsStatus()
       setStatus(s)
-      // channels.status 的 channelOrder 列出已配置的 channel id
+      // channels.status 的 channelOrder 列出已配置的 channel id；
+      // channels[id] 里有 configured/lastError/lastInboundAt/lastOutboundAt 详细字段
       const map: ConnectionState = {}
       for (const cid of s.channelOrder ?? []) {
+        const runtime = (s.channels?.[cid] || {}) as ChannelRuntimeState
         map[cid] = {
           connected: true,
           detail: s.channelDetailLabels?.[cid] ?? '',
+          lastError: runtime.lastError,
+          lastInboundAt: runtime.lastInboundAt,
+          lastOutboundAt: runtime.lastOutboundAt,
         }
       }
       setConnections(map)
@@ -213,16 +237,24 @@ export function ChannelsPage() {
         <div>
           <h2 className="mb-2 text-sm font-semibold text-muted-foreground">🇨🇳 国内常用</h2>
           <div className="grid gap-3 sm:grid-cols-3">
-            {cnChannels.map((def) => (
-              <ChannelCard
-                key={def.id}
-                def={def}
-                connected={!!connections[def.id]?.connected || !!connections['openclaw-weixin']?.connected}
-                detail={connections[def.id]?.detail}
-                onConnect={() => handleConnect(def)}
-                onDisconnect={() => handleDisconnect(def)}
-              />
-            ))}
+            {cnChannels.map((def) => {
+              // 微信特殊：def.id='weixin' 但 status 里 channel id='openclaw-weixin'
+              const actualId = def.id === 'weixin' ? 'openclaw-weixin' : def.id
+              const conn = connections[actualId]
+              return (
+                <ChannelCard
+                  key={def.id}
+                  def={def}
+                  connected={!!conn?.connected}
+                  detail={conn?.detail}
+                  lastInboundAt={conn?.lastInboundAt}
+                  lastOutboundAt={conn?.lastOutboundAt}
+                  lastError={conn?.lastError}
+                  onConnect={() => handleConnect(def)}
+                  onDisconnect={() => handleDisconnect(def)}
+                />
+              )
+            })}
           </div>
         </div>
 
@@ -232,16 +264,22 @@ export function ChannelsPage() {
             <Globe2 className="mr-1 inline h-3.5 w-3.5" /> 国际（需梯子）
           </h2>
           <div className="grid gap-3 sm:grid-cols-3">
-            {intlChannels.map((def) => (
-              <ChannelCard
-                key={def.id}
-                def={def}
-                connected={!!connections[def.id]?.connected}
-                detail={connections[def.id]?.detail}
-                onConnect={() => handleConnect(def)}
-                onDisconnect={() => handleDisconnect(def)}
-              />
-            ))}
+            {intlChannels.map((def) => {
+              const conn = connections[def.id]
+              return (
+                <ChannelCard
+                  key={def.id}
+                  def={def}
+                  connected={!!conn?.connected}
+                  detail={conn?.detail}
+                  lastInboundAt={conn?.lastInboundAt}
+                  lastOutboundAt={conn?.lastOutboundAt}
+                  lastError={conn?.lastError}
+                  onConnect={() => handleConnect(def)}
+                  onDisconnect={() => handleDisconnect(def)}
+                />
+              )
+            })}
           </div>
         </div>
 
@@ -283,15 +321,23 @@ function ChannelCard({
   def,
   connected,
   detail,
+  lastInboundAt,
+  lastOutboundAt,
+  lastError,
   onConnect,
   onDisconnect,
 }: {
   def: ChannelDef
   connected: boolean
   detail?: string
+  lastInboundAt?: number | string | null
+  lastOutboundAt?: number | string | null
+  lastError?: string | null
   onConnect: () => void
   onDisconnect: () => void
 }) {
+  const inboundLabel = formatRelTime(lastInboundAt)
+  const outboundLabel = formatRelTime(lastOutboundAt)
   return (
     <Card className="flex flex-col gap-2 p-3 text-xs" data-channel-id={def.id}>
       <div className="flex items-start gap-2">
@@ -299,7 +345,8 @@ function ChannelCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1 font-medium">
             {def.name}
-            {connected && <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />}
+            {connected && !lastError && <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />}
+            {connected && lastError && <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />}
           </div>
           <div className="mt-0.5 line-clamp-2 text-[10px] text-muted-foreground">{def.description}</div>
           {def.caveat && (
@@ -309,9 +356,30 @@ function ChannelCard({
           )}
         </div>
       </div>
-      {connected && detail && (
-        <div className="rounded bg-muted/40 p-1.5 text-[10px] text-muted-foreground">{detail}</div>
+
+      {/* 已连接卡片：显示运行时状态 */}
+      {connected && (
+        <div className="space-y-1 rounded bg-muted/40 p-1.5 text-[10px]">
+          {detail && (
+            <div className="text-muted-foreground">📡 {detail}</div>
+          )}
+          {(inboundLabel || outboundLabel) && (
+            <div className="flex gap-2 text-muted-foreground">
+              {inboundLabel && <span title="上次收消息">⬇ {inboundLabel}</span>}
+              {outboundLabel && <span title="上次发消息">⬆ {outboundLabel}</span>}
+            </div>
+          )}
+          {!inboundLabel && !outboundLabel && (
+            <div className="text-muted-foreground/70">暂无收发记录</div>
+          )}
+          {lastError && (
+            <div className="text-amber-600 dark:text-amber-400" title={lastError}>
+              ⚠️ {String(lastError).slice(0, 60)}
+            </div>
+          )}
+        </div>
       )}
+
       <div className="mt-auto border-t pt-2">
         {connected ? (
           <Button

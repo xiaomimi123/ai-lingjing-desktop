@@ -329,11 +329,69 @@ export async function installWeixinPlugin(userDataPath, opts = {}) {
       clearTimeout(timer)
       resolve({ code: -1, ok: false, stdout, stderr: stderr + err.message })
     })
-    proc.on('close', (code) => {
+    proc.on('close', async (code) => {
       clearTimeout(timer)
       if (buf) push(buf, 'stdout')
       if (errBuf) push(errBuf, 'stderr')
+      // 装机成功后自动把 'openclaw-weixin' 加进 plugins.allow（去掉那条
+      // 「plugins.allow is empty; discovered non-bundled plugins may auto-load」警告）
+      if (code === 0) {
+        try {
+          await ensurePluginAllowed(userDataPath, 'openclaw-weixin', onLine)
+        } catch (e) {
+          onLine?.(`（plugins.allow 更新失败：${String(e?.message || e)}）`, 'stderr')
+        }
+      }
       resolve({ code, ok: code === 0, stdout, stderr })
+    })
+  })
+}
+
+/**
+ * 把 pluginId 加进 ~/.openclaw/openclaw.json plugins.allow 白名单。
+ * 用 `openclaw config set plugins.allow` 跟 OpenClaw 的 schema 走，
+ * 不直接动 json 避免被 Gateway 启动时 strip。
+ */
+async function ensurePluginAllowed(userDataPath, pluginId, onLine) {
+  // 找 openclaw bin
+  const candidates = openclawBinCandidates(userDataPath)
+  let bin = null
+  for (const c of candidates) {
+    try { await fs.access(c); bin = c; break } catch { /* try next */ }
+  }
+  if (!bin) return
+
+  // 读当前 allow 列表
+  const configPath = path.join(process.env.HOME || process.env.USERPROFILE || '', '.openclaw', 'openclaw.json')
+  let currentAllow = []
+  try {
+    const raw = await fs.readFile(configPath, 'utf-8')
+    const cfg = JSON.parse(raw)
+    currentAllow = cfg?.plugins?.allow || []
+  } catch { /* 文件不存在或解析失败，用空数组 */ }
+
+  if (currentAllow.includes(pluginId)) return  // 已在白名单
+
+  const newAllow = [...currentAllow, pluginId]
+  onLine?.(`\n=== 把 ${pluginId} 加进 plugins.allow 白名单（消除 OpenClaw 警告）===`, 'stderr')
+
+  return new Promise((resolve) => {
+    const env = {
+      ...process.env,
+      PATH: buildChildPath(userDataPath),
+      NO_UPDATE_NOTIFIER: '1',
+    }
+    const proc = spawn(bin, ['config', 'set', 'plugins.allow', JSON.stringify(newAllow), '--strict-json'], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env,
+    })
+    let out = ''
+    proc.stdout.on('data', (d) => (out += d.toString()))
+    proc.stderr.on('data', (d) => (out += d.toString()))
+    proc.on('error', () => resolve())
+    proc.on('close', (code) => {
+      onLine?.(out.trim() || (code === 0 ? 'plugins.allow 已更新' : `set 失败 exit ${code}`), 'stderr')
+      resolve()
     })
   })
 }

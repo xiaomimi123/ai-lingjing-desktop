@@ -16,6 +16,16 @@ export interface ChannelInfo {
   [k: string]: unknown
 }
 
+/** channels.status payload 里 channels[id] 的运行时状态字段 */
+export interface ChannelRuntimeState {
+  configured?: boolean
+  enabled?: boolean
+  lastError?: string | null
+  lastInboundAt?: number | string | null   // 上次收消息
+  lastOutboundAt?: number | string | null  // 上次发消息
+  [k: string]: unknown
+}
+
 export interface ChannelsStatus {
   ts?: number
   channelOrder: string[]
