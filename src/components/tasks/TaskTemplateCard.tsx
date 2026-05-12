@@ -1,7 +1,6 @@
 // 任务模板卡。点击 → 打开 ParamsDialog 填参数 → 触发执行。
 
 import { ShieldCheck, ShieldAlert, ShieldX } from 'lucide-react'
-import { Card } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import {
   type TaskTemplate,
@@ -24,31 +23,32 @@ export function TaskTemplateCard({ template, onSelect }: TaskTemplateCardProps) 
   const Icon = template.icon
   const SafetyIcon = SAFETY_ICON[template.safetyLevel]
   return (
-    <Card
+    <button
+      type="button"
       data-testid="task-template-card"
       data-template-id={template.id}
       onClick={onSelect}
-      className="group flex cursor-pointer flex-col gap-3 p-4 transition-shadow hover:shadow-md"
+      className="group flex w-full cursor-pointer flex-col gap-2.5 rounded-lg border bg-card p-3.5 text-left transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
-      <div className="flex items-start justify-between">
-        <div className="flex h-10 w-10 items-center justify-center rounded-md border bg-muted text-muted-foreground group-hover:bg-accent group-hover:text-accent-foreground">
-          <Icon className="h-5 w-5" />
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex h-9 w-9 items-center justify-center rounded-md bg-muted text-muted-foreground transition-colors group-hover:bg-primary/10 group-hover:text-primary">
+          <Icon className="h-[18px] w-[18px]" strokeWidth={1.5} />
         </div>
         <div
           className={cn(
-            'flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px]',
+            'flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px]',
             SAFETY_COLOR[template.safetyLevel],
           )}
           title={`安全等级：${SAFETY_LABEL[template.safetyLevel]}`}
         >
-          <SafetyIcon className="h-3 w-3" />
+          <SafetyIcon className="h-3 w-3" strokeWidth={1.75} />
           {SAFETY_LABEL[template.safetyLevel]}
         </div>
       </div>
       <div className="flex-1">
-        <div className="text-sm font-semibold">{template.name}</div>
-        <div className="mt-1 line-clamp-2 text-xs text-muted-foreground">{template.description}</div>
+        <div className="text-sm font-medium">{template.name}</div>
+        <div className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{template.description}</div>
       </div>
-    </Card>
+    </button>
   )
 }
