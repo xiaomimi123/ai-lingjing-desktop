@@ -57,7 +57,7 @@ const CHANNEL_DEFS: ChannelDef[] = [
     emoji: '📱',
     region: 'cn',
     method: 'oauth-login',
-    description: 'OpenClaw 原生支持。点连接后跑 openclaw channels login --channel feishu，按提示完成 OAuth。',
+    description: 'OpenClaw 原生支持。点连接后用 Lark / 飞书 app 扫码登录（类似微信流程）。',
   },
   {
     id: 'qqbot',
@@ -65,9 +65,14 @@ const CHANNEL_DEFS: ChannelDef[] = [
     emoji: '🐧',
     region: 'cn',
     method: 'bot-token',
-    description: 'OpenClaw 原生支持。需要 QQ 频道机器人 token（在 q.qq.com 申请）。',
+    description: '在 q.qq.com 申请 QQ 频道机器人。token 格式：appId:clientSecret（用冒号拼）。',
     fields: [
-      { key: 'token', label: 'Bot Token', placeholder: 'qq bot token', type: 'password' },
+      {
+        key: 'token',
+        label: 'Bot Token',
+        placeholder: '102812345:abcde-secret-key',
+        type: 'password',
+      },
       { key: 'name', label: '账号显示名（可选）', placeholder: '主账号' },
     ],
   },
@@ -484,10 +489,11 @@ function ProgressDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const isScanFlow = def.method === 'plugin+qrcode' || def.method === 'oauth-login'
   const stageLabel = {
     starting: '准备中…',
     installing: '正在安装 plugin（npm install）…',
-    'logging-in': stage === 'logging-in' && def.method === 'plugin+qrcode' ? '请用手机扫码登录' : '登录中…',
+    'logging-in': isScanFlow ? '请用手机扫码登录' : '登录中…',
     done: '已完成 ✓',
     failed: '失败',
   }[stage]
@@ -513,10 +519,13 @@ function ProgressDialog({
         </DialogHeader>
 
         <div className="space-y-2">
-          {def.method === 'plugin+qrcode' && (
+          {(def.method === 'plugin+qrcode' || def.method === 'oauth-login') && (
             <div className="rounded-md border border-blue-200 bg-blue-50 p-2 text-[11px] text-blue-800 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-200">
-              📱 看到二维码（密集的 ██ 方块）后，用手机微信「扫一扫」对准屏幕扫。
-              二维码偏宽，下方面板可左右滚动 — 如果显示不全把窗口拉大点。
+              📱 看到二维码（密集的 ██ 方块）后，用对应 app 扫一扫：
+              <span className="font-medium">
+                {def.id === 'weixin' ? '微信「扫一扫」' : def.id === 'feishu' ? '飞书 / Lark 扫一扫' : '对应 app 扫一扫'}
+              </span>
+              。二维码偏宽，下方面板可左右滚动；如显示不全把窗口拉大点。
             </div>
           )}
           {/*
