@@ -129,11 +129,27 @@ export interface LingjingPreload {
   runtimeUninstall(): Promise<{ ok: boolean; removed?: string; message?: string }>
   runtimeDiskUsage(): Promise<{ ok: boolean; bytes: number; path: string }>
   runtimeOnProgress(cb: (progress: RuntimeProgress) => void): () => void
+
+  channelsList(): Promise<{ ok: boolean; data?: unknown; raw?: string; message?: string }>
+  channelsCapabilities(channel: string): Promise<{ ok: boolean; text?: string; message?: string }>
+  channelsAdd(params: { channel: string; options?: Record<string, unknown> }): Promise<{ ok: boolean; stdout?: string; message?: string }>
+  channelsLogin(params: { channel: string; account?: string }): Promise<{ code: number; stdout: string; stderr: string }>
+  channelsLogout(params: { channel: string; account?: string }): Promise<{ ok: boolean; message?: string }>
+  channelsRemove(params: { channel: string; account?: string }): Promise<{ ok: boolean; message?: string }>
+  channelsInstallWeixin(): Promise<{ code: number; ok: boolean; stdout: string; stderr: string }>
+  channelsOnProgress(cb: (p: ChannelsProgress) => void): () => void
   selectFile(opts?: SelectFileOptions): Promise<SelectResult>
   selectFolder(opts?: SelectFolderOptions): Promise<SelectResult>
   saveFile(opts?: SaveFileOptions): Promise<SaveResult>
   showInFolder(path: string): Promise<{ ok: boolean; message?: string }>
   readTextFile(path: string): Promise<{ ok: boolean; content?: string; message?: string }>
+}
+
+export interface ChannelsProgress {
+  stage: 'login' | 'install-weixin'
+  channel: string
+  source: 'stdout' | 'stderr'
+  line: string
 }
 
 export interface RuntimeProgress {

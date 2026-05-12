@@ -67,6 +67,23 @@ contextBridge.exposeInMainWorld('lingjing', {
   runtimeEnsureOpenClaw: () => ipcRenderer.invoke('lingjing:runtime-ensure-openclaw'),
   runtimeUninstall: () => ipcRenderer.invoke('lingjing:runtime-uninstall'),
   runtimeDiskUsage: () => ipcRenderer.invoke('lingjing:runtime-disk-usage'),
+
+  /**
+   * Channels CLI bridge（Phase 15.1）。包 openclaw channels 子命令 + 微信 plugin。
+   * Login / install-weixin 是长任务，订阅 channelsOnProgress 看流式输出（扫码 ASCII / npm install log）。
+   */
+  channelsList: () => ipcRenderer.invoke('lingjing:channels-list'),
+  channelsCapabilities: (channel) => ipcRenderer.invoke('lingjing:channels-capabilities', { channel }),
+  channelsAdd: (params) => ipcRenderer.invoke('lingjing:channels-add', params),
+  channelsLogin: (params) => ipcRenderer.invoke('lingjing:channels-login', params),
+  channelsLogout: (params) => ipcRenderer.invoke('lingjing:channels-logout', params),
+  channelsRemove: (params) => ipcRenderer.invoke('lingjing:channels-remove', params),
+  channelsInstallWeixin: () => ipcRenderer.invoke('lingjing:channels-install-weixin'),
+  channelsOnProgress: (cb) => {
+    const listener = (_evt, payload) => cb(payload)
+    ipcRenderer.on('lingjing:channels-progress', listener)
+    return () => ipcRenderer.off('lingjing:channels-progress', listener)
+  },
   runtimeOnProgress: (cb) => {
     const listener = (_evt, payload) => cb(payload)
     ipcRenderer.on('lingjing:runtime-progress', listener)

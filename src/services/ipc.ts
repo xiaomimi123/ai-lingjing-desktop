@@ -166,6 +166,48 @@ export const ipc = {
     return window.lingjing.runtimeDiskUsage()
   },
 
+  // —— Channels CLI bridge ——
+
+  channelsList() {
+    if (!window.lingjing) return Promise.resolve(notInElectron({ ok: false, message: 'not-in-electron' }))
+    return window.lingjing.channelsList()
+  },
+
+  channelsCapabilities(channel: string) {
+    if (!window.lingjing) return Promise.resolve(notInElectron({ ok: false, message: 'not-in-electron' }))
+    return window.lingjing.channelsCapabilities(channel)
+  },
+
+  channelsAdd(channel: string, options: Record<string, unknown> = {}) {
+    if (!window.lingjing) return Promise.resolve(notInElectron({ ok: false, message: 'not-in-electron' }))
+    return window.lingjing.channelsAdd({ channel, options })
+  },
+
+  channelsLogin(channel: string, account?: string) {
+    if (!window.lingjing) return Promise.resolve(notInElectron({ code: -1, stdout: '', stderr: 'not-in-electron' }))
+    return window.lingjing.channelsLogin({ channel, account })
+  },
+
+  channelsLogout(channel: string, account?: string) {
+    if (!window.lingjing) return Promise.resolve(notInElectron({ ok: false, message: 'not-in-electron' }))
+    return window.lingjing.channelsLogout({ channel, account })
+  },
+
+  channelsRemove(channel: string, account?: string) {
+    if (!window.lingjing) return Promise.resolve(notInElectron({ ok: false, message: 'not-in-electron' }))
+    return window.lingjing.channelsRemove({ channel, account })
+  },
+
+  channelsInstallWeixin() {
+    if (!window.lingjing) return Promise.resolve(notInElectron({ code: -1, ok: false, stdout: '', stderr: 'not-in-electron' }))
+    return window.lingjing.channelsInstallWeixin()
+  },
+
+  channelsOnProgress(cb: (p: unknown) => void): () => void {
+    if (!window.lingjing) return () => {}
+    return window.lingjing.channelsOnProgress(cb as never)
+  },
+
   runtimeOnProgress(cb: (p: unknown) => void): () => void {
     if (!window.lingjing) return () => {}
     return window.lingjing.runtimeOnProgress(cb as never)

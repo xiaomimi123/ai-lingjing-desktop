@@ -7,6 +7,15 @@ import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { nodeBinCandidates, openclawBinCandidates, hermesBinCandidates, buildChildPath, IS_WIN } from './platform.js'
 import { ensureBundledNode, ensureBundledOpenClaw, isBundledNodeReady, isBundledOpenClawReady, NODE_VERSION } from './runtime-installer.js'
+import {
+  listChannels as channelsListCli,
+  getCapabilities as channelsCapabilities,
+  addChannel as channelsAdd,
+  loginChannel as channelsLogin,
+  logoutChannel as channelsLogout,
+  removeChannel as channelsRemove,
+  installWeixinPlugin,
+} from './channels.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -784,6 +793,69 @@ ipcMain.handle('lingjing:runtime-disk-usage', async () => {
   }
   const bytes = await dirSize(runtimeDir)
   return { ok: true, bytes, path: runtimeDir }
+})
+
+// ============================================================================
+// Channels CLI bridge（Phase 15.1.1）— openclaw channels 子命令 + 微信 plugin
+// ============================================================================
+
+ipcMain.handle('lingjing:channels-list', async () => {
+  return channelsListCli(app.getPath('userData'))
+})
+
+ipcMain.handle('lingjing:channels-capabilities', async (_e, params) => {
+  if (!params?.channel) return { ok: false, message: 'channel 必填' }
+  return channelsCapabilities(app.getPath('userData'), params.channel)
+})
+
+ipcMain.handle('lingjing:channels-add', async (_e, params) => {
+  if (!params?.channel) return { ok: false, message: 'channel 必填' }
+  return channelsAdd(app.getPath('userData'), params.channel, params.options || {})
+})
+
+// 长任务：stdout/stderr 实时推到 'lingjing:channels-progress' 事件流。
+// 前端订阅 + 显示扫码二维码 / OAuth 链接 / 错误等。
+ipcMain.handle('lingjing:channels-login', async (_e, params) => {
+  if (!params?.channel) return { code: -1, stdout: '', stderr: 'channel 必填' }
+  return channelsLogin(app.getPath('userData'), params.channel, {
+    account: params.account,
+    onLine: (line, source) => {
+      for (const win of BrowserWindow.getAllWindows()) {
+        win.webContents.send('lingjing:channels-progress', {
+          stage: 'login',
+          channel: params.channel,
+          source,
+          line,
+        })
+      }
+    },
+  })
+})
+
+ipcMain.handle('lingjing:channels-logout', async (_e, params) => {
+  if (!params?.channel) return { ok: false, message: 'channel 必填' }
+  return channelsLogout(app.getPath('userData'), params.channel, params.account)
+})
+
+ipcMain.handle('lingjing:channels-remove', async (_e, params) => {
+  if (!params?.channel) return { ok: false, message: 'channel 必填' }
+  return channelsRemove(app.getPath('userData'), params.channel, params.account)
+})
+
+// 微信特殊：装腾讯第三方 plugin。也是长任务，stdout 推到同一进度事件流。
+ipcMain.handle('lingjing:channels-install-weixin', async () => {
+  return installWeixinPlugin(app.getPath('userData'), {
+    onLine: (line, source) => {
+      for (const win of BrowserWindow.getAllWindows()) {
+        win.webContents.send('lingjing:channels-progress', {
+          stage: 'install-weixin',
+          channel: 'weixin',
+          source,
+          line,
+        })
+      }
+    },
+  })
 })
 
 ipcMain.handle('lingjing:open-external', async (_event, url) => {
