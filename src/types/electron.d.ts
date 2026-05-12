@@ -105,9 +105,18 @@ export interface LingjingPreload {
     ok: boolean
     targetNodeVersion: string
     node: { ready: boolean; version?: string; path?: string; reason?: string; error?: string }
+    openclaw: { ready: boolean; version?: string; path?: string; reason?: string; error?: string }
     runtimeRoot: string
   }>
   runtimeEnsureNode(): Promise<{
+    ok: boolean
+    cached?: boolean
+    version?: string
+    path?: string
+    error?: string
+    message?: string
+  }>
+  runtimeEnsureOpenClaw(): Promise<{
     ok: boolean
     cached?: boolean
     version?: string
@@ -125,14 +134,25 @@ export interface LingjingPreload {
 
 export interface RuntimeProgress {
   component: 'node' | 'openclaw'
-  stage: 'check' | 'download' | 'download-failed' | 'extract' | 'verify' | 'done' | 'error'
+  stage:
+    | 'check'
+    | 'download'
+    | 'download-failed'
+    | 'extract'
+    | 'install'
+    | 'install-failed'
+    | 'verify'
+    | 'done'
+    | 'error'
   source?: string
   url?: string
+  registry?: string
   percent?: number
   downloaded?: number
   total?: number
   speedBytesPerSec?: number
   filename?: string
+  line?: string
   cached?: boolean
   version?: string
   error?: string

@@ -146,6 +146,13 @@ export const ipc = {
     return window.lingjing.runtimeEnsureNode()
   },
 
+  runtimeEnsureOpenClaw() {
+    if (!window.lingjing) {
+      return Promise.resolve(notInElectron({ ok: false, error: 'not-in-electron' }))
+    }
+    return window.lingjing.runtimeEnsureOpenClaw()
+  },
+
   runtimeOnProgress(cb: (p: unknown) => void): () => void {
     if (!window.lingjing) return () => {}
     return window.lingjing.runtimeOnProgress(cb as never)

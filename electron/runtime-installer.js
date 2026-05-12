@@ -19,6 +19,11 @@ import AdmZip from 'adm-zip'
 import { bundledRuntimeRoot, IS_WIN } from './platform.js'
 
 export const NODE_VERSION = 'v22.12.0'
+// OpenClaw 在 npm registry 上的包名。最新版让 npm 自己解析（不锁版本，跟 brew 装一致）。
+// 想锁定时改成 `openclaw@2026.4.21` 类似。
+export const OPENCLAW_PACKAGE = 'openclaw'
+const NPM_REGISTRY_PRIMARY = 'https://registry.npmmirror.com'
+const NPM_REGISTRY_OFFICIAL = 'https://registry.npmjs.org'
 
 const MIRROR_PRIMARY = 'https://registry.npmmirror.com/-/binary/node'
 const MIRROR_OFFICIAL = 'https://nodejs.org/dist'
@@ -50,6 +55,20 @@ export function bundledNodeBinPath(userDataPath) {
   return IS_WIN ? path.join(root, 'node.exe') : path.join(root, 'bin', 'node')
 }
 
+/** 返回 bundled npm 路径（不验证） */
+export function bundledNpmPath(userDataPath) {
+  const root = path.join(bundledRuntimeRoot(userDataPath), 'node')
+  // mac/linux: bin/npm 是 shell 脚本（找同目录 node）
+  // win: npm.cmd 在 root 下
+  return IS_WIN ? path.join(root, 'npm.cmd') : path.join(root, 'bin', 'npm')
+}
+
+/** 返回 bundled openclaw 路径（不验证） */
+export function bundledOpenClawBinPath(userDataPath) {
+  const root = path.join(bundledRuntimeRoot(userDataPath), 'openclaw')
+  return IS_WIN ? path.join(root, 'openclaw.cmd') : path.join(root, 'bin', 'openclaw')
+}
+
 /** 检查 bundled node 是否已装好且可跑 */
 export async function isBundledNodeReady(userDataPath) {
   const binPath = bundledNodeBinPath(userDataPath)
@@ -65,6 +84,36 @@ export async function isBundledNodeReady(userDataPath) {
     return { ready: true, version: ver, path: binPath }
   } catch (e) {
     return { ready: false, reason: 'unrunnable', error: String(e?.message || e), path: binPath }
+  }
+}
+
+/** 检查 bundled openclaw 是否已装好且可跑（用 bundled node 跑它） */
+export async function isBundledOpenClawReady(userDataPath) {
+  const ocPath = bundledOpenClawBinPath(userDataPath)
+  if (!existsSync(ocPath)) return { ready: false, reason: 'not-installed' }
+  const nodeBin = bundledNodeBinPath(userDataPath)
+  if (!existsSync(nodeBin)) return { ready: false, reason: 'node-missing' }
+  // openclaw 用 shebang `#!/usr/bin/env node`，直接 spawn 需要 PATH 找到 node。
+  // 用 bundled npm 提供的 wrapper 或者直接走 node + cli.js 更稳。
+  // 这里采用 spawn shell 用 ENV 注入 PATH（含 bundled node）的方式跑 openclaw --version
+  try {
+    const out = await new Promise((resolve, reject) => {
+      const env = {
+        ...process.env,
+        PATH: path.dirname(nodeBin) + (IS_WIN ? ';' : ':') + (process.env.PATH || ''),
+      }
+      const p = spawn(ocPath, ['--version'], { stdio: ['ignore', 'pipe', 'pipe'], env })
+      let s = ''
+      p.stdout.on('data', (d) => (s += d.toString()))
+      p.stderr.on('data', (d) => (s += d.toString()))
+      p.on('close', (code) => (code === 0 ? resolve(s.trim()) : reject(new Error(`exit ${code}: ${s.slice(0, 200)}`))))
+      p.on('error', reject)
+    })
+    // openclaw --version 输出形如 "2026.4.21"
+    const v = out.split('\n')[0].trim()
+    return { ready: true, version: v, path: ocPath }
+  } catch (e) {
+    return { ready: false, reason: 'unrunnable', error: String(e?.message || e), path: ocPath }
   }
 }
 
@@ -247,6 +296,132 @@ export async function ensureBundledNode(userDataPath, onProgress) {
   // 5) 校验 node --version 能跑
   onProgress?.({ stage: 'verify' })
   const verify = await isBundledNodeReady(userDataPath)
+  if (!verify.ready) {
+    onProgress?.({ stage: 'error', error: `校验失败：${verify.error || verify.reason}` })
+    return { ok: false, error: 'verify-failed', message: verify.error || verify.reason }
+  }
+
+  onProgress?.({ stage: 'done', cached: false, version: verify.version })
+  return { ok: true, cached: false, version: verify.version, path: verify.path }
+}
+
+/**
+ * 用 bundled npm 装 OpenClaw 到 userData/runtime/openclaw/。
+ * 必须先 ensureBundledNode（OpenClaw 不能没 node 跑）。
+ *
+ * 进度推送是 line-based（不像下载有 percent）—— npm 自己输出去 stdout，
+ * 我们把最新一行 push 给前端做 hint。
+ */
+export async function ensureBundledOpenClaw(userDataPath, onProgress) {
+  onProgress?.({ stage: 'check' })
+
+  // 1) 前置：node 必须 ready
+  const nodeState = await isBundledNodeReady(userDataPath)
+  if (!nodeState.ready) {
+    onProgress?.({ stage: 'error', error: 'bundled Node 未安装，请先调 ensureBundledNode' })
+    return { ok: false, error: 'node-not-ready', message: nodeState.error || nodeState.reason }
+  }
+
+  // 2) 已装 + 可跑 → cached
+  const existing = await isBundledOpenClawReady(userDataPath)
+  if (existing.ready) {
+    onProgress?.({ stage: 'done', cached: true, version: existing.version })
+    return { ok: true, cached: true, version: existing.version, path: existing.path }
+  }
+
+  // 3) 走 npm install
+  const npmBin = bundledNpmPath(userDataPath)
+  if (!existsSync(npmBin)) {
+    onProgress?.({ stage: 'error', error: 'bundled npm 不见了' })
+    return { ok: false, error: 'npm-missing' }
+  }
+  const targetDir = path.join(bundledRuntimeRoot(userDataPath), 'openclaw')
+  // 清残留半装
+  await fs.rm(targetDir, { recursive: true, force: true })
+  await fs.mkdir(targetDir, { recursive: true })
+
+  // 镜像优先策略：先 npmmirror，失败 fallback 官方
+  const registries = [
+    { name: 'npmmirror (国内)', url: NPM_REGISTRY_PRIMARY },
+    { name: 'npmjs.org 官方', url: NPM_REGISTRY_OFFICIAL },
+  ]
+
+  let installOk = false
+  let lastError = null
+  let lastLog = ''
+
+  for (const reg of registries) {
+    onProgress?.({ stage: 'install', source: reg.name, registry: reg.url, line: `开始安装 ${OPENCLAW_PACKAGE}...` })
+    try {
+      await new Promise((resolve, reject) => {
+        // 让 bundled npm 用 bundled node：把 node 目录加到 PATH 头部
+        const nodeBin = bundledNodeBinPath(userDataPath)
+        const env = {
+          ...process.env,
+          PATH: path.dirname(nodeBin) + (IS_WIN ? ';' : ':') + (process.env.PATH || ''),
+          // 防 npm fund / audit 输出污染 progress
+          NO_UPDATE_NOTIFIER: '1',
+          npm_config_fund: 'false',
+          npm_config_audit: 'false',
+        }
+        const args = [
+          'install', '-g',
+          `--prefix=${targetDir}`,
+          `--registry=${reg.url}`,
+          OPENCLAW_PACKAGE,
+        ]
+        const p = spawn(npmBin, args, { stdio: ['ignore', 'pipe', 'pipe'], env })
+
+        const pushLine = (line) => {
+          const trimmed = line.trim()
+          if (!trimmed) return
+          lastLog = trimmed
+          onProgress?.({ stage: 'install', source: reg.name, line: trimmed })
+        }
+        let stdoutBuf = ''
+        let stderrBuf = ''
+        p.stdout.on('data', (d) => {
+          stdoutBuf += d.toString()
+          let i
+          while ((i = stdoutBuf.indexOf('\n')) >= 0) {
+            pushLine(stdoutBuf.slice(0, i))
+            stdoutBuf = stdoutBuf.slice(i + 1)
+          }
+        })
+        p.stderr.on('data', (d) => {
+          stderrBuf += d.toString()
+          let i
+          while ((i = stderrBuf.indexOf('\n')) >= 0) {
+            pushLine(stderrBuf.slice(0, i))
+            stderrBuf = stderrBuf.slice(i + 1)
+          }
+        })
+        p.on('error', reject)
+        p.on('close', (code) => {
+          if (stdoutBuf) pushLine(stdoutBuf)
+          if (stderrBuf) pushLine(stderrBuf)
+          code === 0 ? resolve() : reject(new Error(`npm install exit ${code}: ${lastLog}`))
+        })
+      })
+      installOk = true
+      break
+    } catch (e) {
+      lastError = e
+      onProgress?.({ stage: 'install-failed', source: reg.name, error: String(e?.message || e) })
+      // 清残留，下一个 registry 重试
+      await fs.rm(targetDir, { recursive: true, force: true })
+      await fs.mkdir(targetDir, { recursive: true })
+    }
+  }
+
+  if (!installOk) {
+    onProgress?.({ stage: 'error', error: `所有 registry 安装失败: ${lastError?.message || lastError}` })
+    return { ok: false, error: 'install-failed', message: String(lastError?.message || lastError) }
+  }
+
+  // 4) 校验
+  onProgress?.({ stage: 'verify' })
+  const verify = await isBundledOpenClawReady(userDataPath)
   if (!verify.ready) {
     onProgress?.({ stage: 'error', error: `校验失败：${verify.error || verify.reason}` })
     return { ok: false, error: 'verify-failed', message: verify.error || verify.reason }
