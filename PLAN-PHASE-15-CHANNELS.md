@@ -116,13 +116,61 @@ UI 走 `bot-token` method（FormDialog），用户填 token 后 `channels add --
 | Phase | 状态 | 时间 |
 |-------|------|------|
 | 15.1 | ✅ | 已完成 |
-| 15.2 | 待办 | 1-1.5 天 |
+| 15.2 | ✅ | 国际 3 channel + 缺 dep 自动装 |
+| 15.3 | ✅ | plugins.allow 警告消 + 卡片显运行状态 |
 
 ---
 
-## 5. 下一步
+## 5. 拿真 bot token / 账号端到端测试指南
 
-- [ ] 15.2 实测 + 调试国际 3 channel
-- [ ] 15.2 收尾 commit + tag react-v1.1-phase15.2
+每个 channel 你自己有 bot 时按以下步骤完整验证：
 
-后续可能 phase 16 看产品方向（更多 channel adapter / cron 触发 / 跨设备同步等）。
+### 微信
+1. 进通信渠道 → 点「微信」连接 → ProgressDialog 出二维码
+2. 用手机微信「扫一扫」对准屏幕扫
+3. 微信端确认「同意登录」
+4. dialog 自动关闭 → 卡片右上 ✓ → 显示 detail「openclaw-weixin (long-poll)」
+5. 在手机微信给该 bot 发条消息 → 灵境对话页能看到 Agent 收到
+6. 让 Agent 回复 → 微信端能收到回复
+
+### 飞书 / Lark
+1. 在 [open.feishu.cn](https://open.feishu.cn) 建一个企业 app
+   （需企业邮箱 + 创建租户）
+2. 进通信渠道 → 点「飞书」连接 → ProgressDialog 出二维码
+3. 用飞书 / Lark app 扫一扫 → 授权
+4. 卡片显示已连接，验证收发同微信
+
+### QQ Bot
+1. 在 [q.qq.com/qqbot](https://q.qq.com/qqbot/) 申请 QQ 频道机器人
+2. 拿到 `appId` 和 `clientSecret`
+3. 进通信渠道 → 点「QQ Bot」连接 → 表单填 token = `appId:clientSecret`
+   （冒号拼接），name 可填「主账号」
+4. 提交后卡片显示已连接
+5. 在 QQ 频道 @ bot 发消息测试
+
+### Telegram
+1. 在 Telegram 找 `@BotFather` → `/newbot` → 拿 token（形如 `123456:ABC-DEF...`）
+2. **必须挂梯子**（国内连不通 t.me）
+3. 进通信渠道 → 点「Telegram」连接 → 表单填 token
+4. 第一次会**自动装 grammy npm 包**（10 秒）→ 自动重试 add → 成功
+5. 在 Telegram 私聊 bot 测试
+
+### Discord
+1. 在 [discord.com/developers/applications](https://discord.com/developers/applications) 建 bot → 拿 token
+2. 给 bot 添加 OAuth2 URL 让它加入你的 server
+3. 进通信渠道 → 点「Discord」连接 → 表单填 token（无需装 dep，OpenClaw 自带 discord.js）
+4. 在 server 里 @ bot 测试
+
+### Slack
+1. 在 [api.slack.com/apps](https://api.slack.com/apps) 创 app → 装到 workspace
+2. 拿 Bot Token (xoxb-...) + App Token (xapp-...)
+3. 进通信渠道 → 点「Slack」连接 → 双 token 表单
+4. 第一次会**自动装 @slack/web-api npm 包**→ 自动重试 add → 成功
+5. Slack workspace 里跟 bot DM 测试
+
+---
+
+## 6. 下一步候选方向
+
+- Phase 16 产品方向待定（更多 channel / cron 触发 channels / 跨设备同步 / Win 实机验证）
+- Channels 模块本身已自洽，可接受用户反馈后再迭代
