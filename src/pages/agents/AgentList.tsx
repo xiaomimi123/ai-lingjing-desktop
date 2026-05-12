@@ -99,60 +99,62 @@ export function AgentList() {
   return (
     <div className="h-full overflow-auto">
       <div className="mx-auto max-w-5xl space-y-4 p-6">
-        <div className="flex items-start justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold">我的 Agent</h1>
-            <p className="text-sm text-muted-foreground">
-              激活后 OpenClaw 按所选 Agent 的人格行动。可从市场安装更多专家。
-            </p>
-          </div>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => (tab === 'installed' ? fetch() : fetchMarket())}
-            disabled={tab === 'installed' ? loading : marketLoading}
-          >
-            <RefreshCw className={cn('mr-1 h-3.5 w-3.5', (loading || marketLoading) && 'animate-spin')} />
-            刷新
-          </Button>
+        <div>
+          <h1 className="text-lg font-semibold">我的 Agent</h1>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            激活后 OpenClaw 按所选 Agent 的人格行动。可从市场安装更多专家。
+          </p>
         </div>
 
-        {/* Tabs */}
-        <div className="flex items-center gap-1 border-b">
-          <button
-            type="button"
-            onClick={() => setTab('installed')}
-            data-testid="tab-installed"
-            data-active={tab === 'installed' || undefined}
-            className={cn(
-              'flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm transition-colors',
-              tab === 'installed'
-                ? 'border-primary text-foreground'
-                : 'border-transparent text-muted-foreground hover:text-foreground',
-            )}
+        {/* Tabs + 右侧刷新 */}
+        <div className="flex items-center justify-between border-b">
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setTab('installed')}
+              data-testid="tab-installed"
+              data-active={tab === 'installed' || undefined}
+              className={cn(
+                'flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm transition-colors',
+                tab === 'installed'
+                  ? 'border-primary text-foreground'
+                  : 'border-transparent text-muted-foreground hover:text-foreground',
+              )}
+            >
+              <Package className="h-3.5 w-3.5" strokeWidth={1.5} />
+              已安装
+              <span className="ml-1 rounded-full bg-muted px-1.5 py-0.5 text-[10px]">{agents.length}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab('market')}
+              data-testid="tab-market"
+              data-active={tab === 'market' || undefined}
+              className={cn(
+                'flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm transition-colors',
+                tab === 'market'
+                  ? 'border-primary text-foreground'
+                  : 'border-transparent text-muted-foreground hover:text-foreground',
+              )}
+            >
+              <Sparkles className="h-3.5 w-3.5" strokeWidth={1.5} />
+              发现
+              {market.length > 0 && (
+                <span className="ml-1 rounded-full bg-muted px-1.5 py-0.5 text-[10px]">{market.length}</span>
+              )}
+            </button>
+          </div>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="mb-1 h-7 w-7 text-muted-foreground"
+            onClick={() => (tab === 'installed' ? fetch() : fetchMarket())}
+            disabled={tab === 'installed' ? loading : marketLoading}
+            title="刷新"
+            data-testid="agent-refresh"
           >
-            <Package className="h-3.5 w-3.5" />
-            已安装
-            <span className="ml-1 rounded-full bg-muted px-1.5 py-0.5 text-[10px]">{agents.length}</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab('market')}
-            data-testid="tab-market"
-            data-active={tab === 'market' || undefined}
-            className={cn(
-              'flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm transition-colors',
-              tab === 'market'
-                ? 'border-primary text-foreground'
-                : 'border-transparent text-muted-foreground hover:text-foreground',
-            )}
-          >
-            <Sparkles className="h-3.5 w-3.5" />
-            发现
-            {market.length > 0 && (
-              <span className="ml-1 rounded-full bg-muted px-1.5 py-0.5 text-[10px]">{market.length}</span>
-            )}
-          </button>
+            <RefreshCw className={cn('h-3.5 w-3.5', (loading || marketLoading) && 'animate-spin')} />
+          </Button>
         </div>
 
         {(error || toast) && (
