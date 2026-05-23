@@ -189,6 +189,20 @@ export async function isBundledOpenClawReady(userDataPath) {
  */
 async function downloadStream(url, destPath, onProgress, signal) {
   if (signal?.aborted) throw Object.assign(new Error('aborted'), { aborted: true })
+
+  // 代理检测：v1 仅提示，下载本身不走代理（v1.2 接 https-proxy-agent）
+  const proxyUrl =
+    process.env.HTTPS_PROXY ||
+    process.env.https_proxy ||
+    process.env.HTTP_PROXY ||
+    process.env.http_proxy
+  if (proxyUrl) {
+    console.log(
+      '[runtime-installer] 检测到代理环境变量 HTTPS_PROXY=' + proxyUrl +
+      '，但当前版本未走代理（v1.2 会接入 https-proxy-agent）',
+    )
+  }
+
   let currentUrl = url
   for (let redirect = 0; redirect <= MAX_REDIRECTS; redirect++) {
     if (signal?.aborted) throw Object.assign(new Error('aborted'), { aborted: true })
@@ -485,6 +499,11 @@ export async function ensureBundledOpenClaw(userDataPath, onProgress, signal) {
         await new Promise((resolve, reject) => {
           // 让 bundled npm 用 bundled node：把 node 目录加到 PATH 头部
           const nodeBin = bundledNodeBinPath(userDataPath)
+          const proxyUrl =
+            process.env.HTTPS_PROXY ||
+            process.env.https_proxy ||
+            process.env.HTTP_PROXY ||
+            process.env.http_proxy
           const env = {
             ...process.env,
             PATH: path.dirname(nodeBin) + (IS_WIN ? ';' : ':') + (process.env.PATH || ''),
@@ -492,6 +511,9 @@ export async function ensureBundledOpenClaw(userDataPath, onProgress, signal) {
             NO_UPDATE_NOTIFIER: '1',
             npm_config_fund: 'false',
             npm_config_audit: 'false',
+            ...(proxyUrl
+              ? { npm_config_proxy: proxyUrl, npm_config_https_proxy: proxyUrl }
+              : {}),
           }
           const args = [
             'install', '-g',
