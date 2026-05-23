@@ -92,6 +92,39 @@ export const ipc = {
     return window.lingjing.openExternal(url)
   },
 
+  platformHints() {
+    if (!window.lingjing?.platformHints) {
+      // 浏览器环境兜底：按 navigator.platform 猜
+      const isWin = typeof navigator !== 'undefined' && /Win/i.test(navigator.platform || '')
+      return Promise.resolve(isWin
+        ? {
+            platform: 'win32',
+            shell: 'PowerShell / cmd',
+            examples: {
+              openUrl: 'start "" "{url}"',
+              openApp: 'start "" "{app}"',
+              listFiles: 'dir "{dir}"',
+              screenshot: 'powershell -c "Add-Type -AssemblyName System.Windows.Forms; ..."',
+              killByName: 'taskkill /IM "{name}" /F',
+              showProcess: 'tasklist | findstr',
+            },
+          }
+        : {
+            platform: 'darwin',
+            shell: 'Terminal',
+            examples: {
+              openUrl: 'open "{url}"',
+              openApp: 'open -a "{app}"',
+              listFiles: 'ls "{dir}"',
+              screenshot: 'screencapture ~/Desktop/$(date +%s).png',
+              killByName: 'pkill -x "{name}"',
+              showProcess: 'top -l 1 -n 5',
+            },
+          })
+    }
+    return window.lingjing.platformHints()
+  },
+
   skillsSearch(params?: SkillsSearchParams) {
     if (!window.lingjing) return Promise.resolve(notInElectron({ ok: false, message: 'not in Electron' }))
     return window.lingjing.skillsSearch(params)
