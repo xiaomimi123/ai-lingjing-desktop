@@ -137,6 +137,7 @@ async function downloadStream(url, destPath, onProgress, signal) {
       }
       signal?.addEventListener('abort', onAbort, { once: true })
       req.on('error', (err) => {
+        signal?.removeEventListener('abort', onAbort)
         if (signal?.aborted) {
           reject(Object.assign(new Error('aborted'), { aborted: true }))
         } else {
@@ -144,6 +145,7 @@ async function downloadStream(url, destPath, onProgress, signal) {
         }
       })
       req.on('timeout', () => {
+        signal?.removeEventListener('abort', onAbort)
         req.destroy()
         reject(new Error(`timeout connecting to ${currentUrl}`))
       })
@@ -312,6 +314,9 @@ export async function ensureBundledNode(userDataPath, onProgress, signal) {
         await extractTarGz(archivePath, stagingDir)
       }
     } catch (e) {
+      if (signal?.aborted || e?.aborted) {
+        throw Object.assign(new Error('user cancelled'), { aborted: true })
+      }
       onProgress?.({ stage: 'error', error: `解压失败：${e?.message || e}` })
       return { ok: false, error: 'extract-failed', message: String(e?.message || e) }
     }
@@ -321,6 +326,9 @@ export async function ensureBundledNode(userDataPath, onProgress, signal) {
     try {
       await flattenExtracted(stagingDir, info.topDir, nodeRoot)
     } catch (e) {
+      if (signal?.aborted || e?.aborted) {
+        throw Object.assign(new Error('user cancelled'), { aborted: true })
+      }
       onProgress?.({ stage: 'error', error: `布局失败：${e?.message || e}` })
       return { ok: false, error: 'flatten-failed', message: String(e?.message || e) }
     }
