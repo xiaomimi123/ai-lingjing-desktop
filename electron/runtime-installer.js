@@ -439,11 +439,27 @@ export async function probeNodeVersion(nodeBinPath) {
   if (!existsSync(nodeBinPath)) return null
   try {
     const out = await new Promise((resolve, reject) => {
-      const p = spawn(nodeBinPath, ['--version'], { stdio: ['ignore', 'pipe', 'pipe'] })
+      const p = spawn(nodeBinPath, ['--version'], { stdio: ['ignore', 'pipe', 'ignore'] })
       let s = ''
+      let settled = false
+      const finish = (fn, val) => {
+        if (settled) return
+        settled = true
+        try { p.kill('SIGKILL') } catch {}
+        fn(val)
+      }
+      const timer = setTimeout(() => finish(reject, new Error('probe timeout')), 3000)
       p.stdout.on('data', (d) => (s += d.toString()))
-      p.on('close', (code) => (code === 0 ? resolve(s.trim()) : reject(new Error(`exit ${code}`))))
-      p.on('error', reject)
+      p.on('close', (code) => {
+        clearTimeout(timer)
+        if (settled) return
+        settled = true
+        code === 0 ? resolve(s.trim()) : reject(new Error(`exit ${code}`))
+      })
+      p.on('error', (e) => {
+        clearTimeout(timer)
+        finish(reject, e)
+      })
     })
     const m = out.match(/^v(\d+)\.(\d+)\.(\d+)/)
     if (!m) return { raw: out }
