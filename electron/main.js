@@ -1162,10 +1162,15 @@ function buildAppMenu() {
     {
       label: '视图',
       submenu: [
-        { role: 'reload', label: '刷新' },
-        { role: 'forceReload', label: '强制刷新' },
-        { role: 'toggleDevTools', label: '开发者工具' },
-        { type: 'separator' },
+        // dev 模式才显示刷新 + DevTools，生产隐藏防止用户误操作 + 暴露内部
+        ...(isDev
+          ? [
+              { role: 'reload', label: '刷新' },
+              { role: 'forceReload', label: '强制刷新' },
+              { role: 'toggleDevTools', label: '开发者工具' },
+              { type: 'separator' },
+            ]
+          : []),
         { role: 'resetZoom', label: '实际大小' },
         { role: 'zoomIn', label: '放大' },
         { role: 'zoomOut', label: '缩小' },
