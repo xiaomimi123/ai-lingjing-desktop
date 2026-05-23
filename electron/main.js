@@ -742,6 +742,17 @@ ipcMain.handle('lingjing:runtime-ensure-node', async () => {
       win.webContents.send('lingjing:runtime-progress', { component: 'node', ...progress })
     }
   })
+  // Node 装好（非缓存命中）→ 重启后端，让它用新 node。
+  // backend 之前可能因为找不到 node 已经 crash，stopBackend 是幂等的。
+  if (result.ok && !result.cached) {
+    console.log('[main] bundled Node 装好，重启后端使用它')
+    stopBackend()
+    await new Promise((r) => setTimeout(r, 500))
+    await startBackend().catch((e) =>
+      console.error('[main] 重启后端失败:', e?.message || e),
+    )
+    await pingTcp(BACKEND_HOST, BACKEND_PORT, { timeoutMs: 10000 }).catch(() => {})
+  }
   return result
 })
 
@@ -752,6 +763,7 @@ ipcMain.handle('lingjing:runtime-ensure-openclaw', async () => {
       win.webContents.send('lingjing:runtime-progress', { component: 'openclaw', ...progress })
     }
   })
+  // openclaw 装完不需重启 backend；下次调 /api/rpc 时 ensureOpenClawRunning 会按需起 Gateway。
   return result
 })
 
