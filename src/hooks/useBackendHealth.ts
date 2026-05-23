@@ -18,10 +18,14 @@ export function useBackendHealth() {
   useEffect(() => {
     let cancelled = false
     let timer: ReturnType<typeof setTimeout> | null = null
+    let abortController: AbortController | null = null
 
     const tick = async () => {
+      abortController = new AbortController()
+      const timeoutId = setTimeout(() => abortController?.abort(), 3000)
       try {
-        const r = await fetch('/api/health', { cache: 'no-store' })
+        const r = await fetch('/api/health', { cache: 'no-store', signal: abortController.signal })
+        clearTimeout(timeoutId)
         if (!cancelled) {
           if (r.ok) {
             setState({ ok: true, lastChecked: Date.now(), failures: 0 })
@@ -34,6 +38,7 @@ export function useBackendHealth() {
           }
         }
       } catch {
+        clearTimeout(timeoutId)
         if (!cancelled) {
           setState((s) => ({
             ok: s.failures + 1 < FAIL_THRESHOLD,
@@ -42,6 +47,7 @@ export function useBackendHealth() {
           }))
         }
       } finally {
+        abortController = null
         if (!cancelled) timer = setTimeout(tick, POLL_INTERVAL_MS)
       }
     }
@@ -50,6 +56,7 @@ export function useBackendHealth() {
     return () => {
       cancelled = true
       if (timer) clearTimeout(timer)
+      abortController?.abort()
     }
   }, [])
 
