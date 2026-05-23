@@ -2,7 +2,7 @@
   "name": "ai-lingjing-desktop",
   "productName": "灵境",
   "private": false,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "license": "Apache-2.0",
   "description": "灵境桌面 — Mac 上的 AI Agent 行动平台，让 AI 真正能操作你的电脑。基于 OpenClaw + Electron + React。",
   "author": "lizhishaoniange",
