@@ -3,6 +3,7 @@
 
 import { create } from 'zustand'
 import { ipc } from '@/services/ipc'
+import { isWindowsPlatform } from '@/lib/platform'
 
 // RuntimeStatus 类型未单独从 ipc 导出，这里从返回值推断后 re-export，
 // 派生函数（isOpenclawAvailable / isHermesAvailable）和组件可共用。
@@ -44,15 +45,7 @@ export function isOpenclawAvailable(status: RuntimeStatus | null): boolean {
 
 /** Hermes 是否可用。Win 平台 v1 不支持（PLAN 14 明确不迁），始终 false。 */
 export function isHermesAvailable(status: RuntimeStatus | null): boolean {
-  // Electron 下 ipc.platform 来自 preload 同步暴露的 process.platform，
-  // 浏览器/dev server 下返回 'browser'，此时按 navigator 兜底猜一次。
-  const platform = ipc.platform
-  const isWin =
-    platform === 'win32' ||
-    (platform === 'browser' &&
-      typeof navigator !== 'undefined' &&
-      /Win/i.test(navigator.platform || ''))
-  if (isWin) return false
+  if (isWindowsPlatform()) return false
   if (!status) return true
   return true
 }
