@@ -38,6 +38,10 @@ const VITE_DEV_URL = `http://${VITE_DEV_HOST}:${VITE_DEV_PORT}`
 let welcomeWindow = null
 let mainWindow = null
 let backendProcess = null
+let backendRestartAttempts = 0
+const MAX_BACKEND_RESTART = 3
+let backendStartedAt = 0
+let backendStoppingFlag = false  // stopBackend 调用期间置 true，避免 exit 触发重试
 
 /**
  * 找一个能跑 server/index.js 的 node 二进制。
@@ -80,11 +84,42 @@ async function startBackend() {
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
+  backendStartedAt = Date.now()
   backendProcess.stdout?.on('data', (d) => process.stdout.write(`[backend] ${d}`))
   backendProcess.stderr?.on('data', (d) => process.stderr.write(`[backend!] ${d}`))
   backendProcess.on('exit', (code, signal) => {
-    console.log(`[main] 后端退出 code=${code} signal=${signal}`)
+    const aliveMs = Date.now() - backendStartedAt
+    console.log(`[main] 后端退出 code=${code} signal=${signal} aliveFor=${aliveMs}ms`)
     backendProcess = null
+
+    // 主动 stop → 不重试
+    if (backendStoppingFlag) return
+    if (signal === 'SIGTERM' || signal === 'SIGKILL') return
+
+    // 长寿退出 = 跑过 5s 才挂 → 大概率是后续异常，不无限重启，但重置计数
+    if (aliveMs > 5000) {
+      backendRestartAttempts = 0
+      return
+    }
+
+    // 短命退出：启动失败，退避重试
+    if (backendRestartAttempts >= MAX_BACKEND_RESTART) {
+      console.error(`[main] 后端重启 ${MAX_BACKEND_RESTART} 次仍失败，放弃`)
+      for (const win of BrowserWindow.getAllWindows()) {
+        win.webContents.send('lingjing:backend-status', {
+          ok: false,
+          reason: 'restart-exhausted',
+          attempts: backendRestartAttempts,
+        })
+      }
+      return
+    }
+    backendRestartAttempts += 1
+    const delay = Math.min(2000 * 2 ** (backendRestartAttempts - 1), 15000)
+    console.log(`[main] ${delay}ms 后第 ${backendRestartAttempts} 次重启后端`)
+    setTimeout(() => {
+      startBackend().catch((e) => console.error('[main] 重启失败:', e?.message || e))
+    }, delay)
   })
 }
 
@@ -182,6 +217,8 @@ async function stopBackend() {
   const proc = backendProcess
   backendProcess = null
   console.log('[main] 杀后端 pid=', proc.pid)
+  backendStoppingFlag = true
+  backendRestartAttempts = 0  // 主动 stop 时清重试计数
 
   return new Promise((resolve) => {
     let settled = false
@@ -190,6 +227,7 @@ async function stopBackend() {
       settled = true
       clearTimeout(killTimer)
       clearTimeout(hardTimer)
+      backendStoppingFlag = false
       resolve()
     }
 
