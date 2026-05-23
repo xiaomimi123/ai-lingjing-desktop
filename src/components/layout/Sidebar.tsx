@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useAgentStore } from '@/stores/agent-store'
 import { useProductStore, type ProductId } from '@/stores/product-store'
-import { useRuntimeStore } from '@/stores/runtime-store'
+import { useRuntimeStore, isOpenclawAvailable, isHermesAvailable } from '@/stores/runtime-store'
 import { useTheme } from '@/hooks/useTheme'
 
 interface ProductItem {
@@ -146,8 +146,9 @@ function BottomRailItem({ item }: { item: BottomItem }) {
 
 export function Sidebar() {
   const fetchAgents = useAgentStore((s) => s.fetch)
-  const openclawAvailable = useRuntimeStore((s) => s.openclawAvailable())
-  const hermesAvailable = useRuntimeStore((s) => s.hermesAvailable())
+  const runtimeStatus = useRuntimeStore((s) => s.status)
+  const openclawAvailable = isOpenclawAvailable(runtimeStatus)
+  const hermesAvailable = isHermesAvailable(runtimeStatus)
   useEffect(() => {
     fetchAgents()
   }, [fetchAgents])

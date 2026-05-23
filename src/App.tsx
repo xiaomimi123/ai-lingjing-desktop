@@ -7,7 +7,7 @@
 //   4. 拿到本地 token 后，refresh 灵境云端 session（lingjing-auth-store）
 //   5. 灵境未登录 且 当前不在 /onboarding → RouterProvider 内部会做 redirect
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { RouterProvider } from 'react-router-dom'
 import { useTheme } from '@/hooks/useTheme'
 import { useAuth } from '@/hooks/useAuth'
@@ -16,32 +16,22 @@ import { useRuntimeStore } from '@/stores/runtime-store'
 import { router } from '@/router'
 import { LoginGate } from '@/components/auth/LoginGate'
 import { RuntimeSetupPage } from '@/pages/onboarding/RuntimeSetupPage'
-import { ipc } from '@/services/ipc'
 
 export default function App() {
   useTheme()
   // Runtime gate — 首启检测 bundled / 系统 Node+OpenClaw
-  // null 表示还在检测，true 要 onboarding，false 直接进
-  const [needsRuntimeSetup, setNeedsRuntimeSetup] = useState<boolean | null>(null)
-
-  // 把 runtimeStatus 缓存到全局 store，给 Sidebar / SecondaryPanel 灰显逻辑用
+  // 用 store 唯一拉一次，App + Sidebar + SecondaryPanel 共享同一份 status，
+  // 避免之前 App 单独 ipc.runtimeStatus() + store.refresh() 起两次 IPC。
   const refreshRuntime = useRuntimeStore((s) => s.refresh)
+  const runtimeStatus = useRuntimeStore((s) => s.status)
+  const runtimeLoading = useRuntimeStore((s) => s.loading)
   useEffect(() => {
     void refreshRuntime()
   }, [refreshRuntime])
 
-  useEffect(() => {
-    let cancelled = false
-    void (async () => {
-      try {
-        const status = await ipc.runtimeStatus()
-        if (!cancelled) setNeedsRuntimeSetup(status.needsSetup ?? false)
-      } catch {
-        if (!cancelled) setNeedsRuntimeSetup(false) // 出错就不挡，给用户机会
-      }
-    })()
-    return () => { cancelled = true }
-  }, [])
+  // 派生：还没拉到 status 时 null（=loading），拿到后看 needsSetup
+  const needsRuntimeSetup: boolean | null =
+    runtimeLoading && !runtimeStatus ? null : runtimeStatus?.needsSetup ?? false
 
   const { authEnabled, needsLogin, checking, error, login, token, tokenVerified } = useAuth()
   const refreshLingjing = useLingjingAuthStore((s) => s.refreshSelf)
@@ -64,7 +54,8 @@ export default function App() {
 
   // 1. Runtime 缺，弹 onboarding
   if (needsRuntimeSetup === true) {
-    return <RuntimeSetupPage onComplete={() => setNeedsRuntimeSetup(false)} />
+    // 装完后重拉 store，needsSetup 会变 false，自然走到主界面
+    return <RuntimeSetupPage onComplete={() => { void refreshRuntime() }} />
   }
 
   // 拉本地配置中
