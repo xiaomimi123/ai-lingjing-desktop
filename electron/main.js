@@ -39,6 +39,7 @@ let welcomeWindow = null
 let mainWindow = null
 let backendProcess = null
 let backendRestartAttempts = 0
+let currentRuntimeAbort = null  // 当前长任务 (ensureBundledNode/OpenClaw) 的 AbortController
 const MAX_BACKEND_RESTART = 3
 let backendStartedAt = 0
 let backendStoppingFlag = false  // stopBackend 调用期间置 true，避免 exit 触发重试
@@ -835,11 +836,13 @@ async function restartBackendForNode() {
 // 长任务：webContents.send 推 progress 给所有窗口。前端订阅 'lingjing:runtime-progress'
 ipcMain.handle('lingjing:runtime-ensure-node', async () => {
   const userData = app.getPath('userData')
+  currentRuntimeAbort?.abort()
+  currentRuntimeAbort = new AbortController()
   const result = await ensureBundledNode(userData, (progress) => {
     for (const win of BrowserWindow.getAllWindows()) {
       win.webContents.send('lingjing:runtime-progress', { component: 'node', ...progress })
     }
-  })
+  }, currentRuntimeAbort.signal)
   // Node 装好（非缓存命中）→ 重启后端，让它用新 node。
   // backend 之前可能因为找不到 node 已经 crash，stopBackend 是幂等的。
   if (result.ok && !result.cached) {
@@ -860,13 +863,24 @@ ipcMain.handle('lingjing:runtime-ensure-node', async () => {
 
 ipcMain.handle('lingjing:runtime-ensure-openclaw', async () => {
   const userData = app.getPath('userData')
+  currentRuntimeAbort?.abort()
+  currentRuntimeAbort = new AbortController()
   const result = await ensureBundledOpenClaw(userData, (progress) => {
     for (const win of BrowserWindow.getAllWindows()) {
       win.webContents.send('lingjing:runtime-progress', { component: 'openclaw', ...progress })
     }
-  })
+  }, currentRuntimeAbort.signal)
   // openclaw 装完不需重启 backend；下次调 /api/rpc 时 ensureOpenClawRunning 会按需起 Gateway。
   return result
+})
+
+// 用户点"取消安装"时触发 abort，让 ensureBundledNode/OpenClaw 中断长任务清残留。
+ipcMain.handle('lingjing:runtime-cancel', async () => {
+  if (currentRuntimeAbort && !currentRuntimeAbort.signal.aborted) {
+    currentRuntimeAbort.abort()
+    return { ok: true }
+  }
+  return { ok: false, message: 'no active op' }
 })
 
 // 删 userData/runtime/ — 强制重装时用。下次启动 onboarding 会重弹。

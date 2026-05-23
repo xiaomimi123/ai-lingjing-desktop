@@ -95,7 +95,8 @@ export function RuntimeSetupPage({ onComplete }: { onComplete: () => void }) {
     setNodeStep({ state: 'running', detail: '准备下载…' })
     const nodeResult = await ipc.runtimeEnsureNode()
     if (!nodeResult.ok) {
-      setNodeStep({ state: 'failed', detail: nodeResult.message || nodeResult.error || '失败' })
+      const isAborted = nodeResult.error === 'aborted' || /abort|cancel|用户取消/i.test(nodeResult.message || '')
+      setNodeStep({ state: 'failed', detail: isAborted ? '已取消' : (nodeResult.message || nodeResult.error || '失败') })
       setPhase('failed')
       return
     }
@@ -105,7 +106,8 @@ export function RuntimeSetupPage({ onComplete }: { onComplete: () => void }) {
     setOpenclawStep({ state: 'running', detail: '准备安装…' })
     const ocResult = await ipc.runtimeEnsureOpenClaw()
     if (!ocResult.ok) {
-      setOpenclawStep({ state: 'failed', detail: ocResult.message || ocResult.error || '失败' })
+      const isAborted = ocResult.error === 'aborted' || /abort|cancel|用户取消/i.test(ocResult.message || '')
+      setOpenclawStep({ state: 'failed', detail: isAborted ? '已取消' : (ocResult.message || ocResult.error || '失败') })
       setPhase('failed')
       return
     }
@@ -165,6 +167,17 @@ export function RuntimeSetupPage({ onComplete }: { onComplete: () => void }) {
             <div className="flex items-center gap-2 rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-800 dark:border-green-900 dark:bg-green-950 dark:text-green-200">
               <CheckCircle2 className="h-4 w-4" /> 全部就绪，进入主界面…
             </div>
+          )}
+
+          {(phase === 'node' || phase === 'openclaw') && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => { void ipc.runtimeCancel() }}
+              className="mt-2"
+            >
+              取消安装
+            </Button>
           )}
 
           {phase === 'failed' && (

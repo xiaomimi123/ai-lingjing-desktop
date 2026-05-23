@@ -66,6 +66,7 @@ contextBridge.exposeInMainWorld('lingjing', {
   runtimeEnsureNode: () => ipcRenderer.invoke('lingjing:runtime-ensure-node'),
   runtimeEnsureOpenClaw: () => ipcRenderer.invoke('lingjing:runtime-ensure-openclaw'),
   runtimeUninstall: () => ipcRenderer.invoke('lingjing:runtime-uninstall'),
+  runtimeCancel: () => ipcRenderer.invoke('lingjing:runtime-cancel'),
   runtimeDiskUsage: () => ipcRenderer.invoke('lingjing:runtime-disk-usage'),
 
   /**

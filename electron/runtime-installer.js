@@ -120,13 +120,29 @@ export async function isBundledOpenClawReady(userDataPath) {
 /**
  * 下载流：手动 follow 302/301 redirect（最多 5 层），pipe 到目标文件。
  * 期间触发 onProgress({ stage:'download', percent, downloaded, total, speed })
+ * 接收可选 signal AbortSignal，用户取消时 destroy req 并抛 aborted 错误。
  */
-async function downloadStream(url, destPath, onProgress) {
+async function downloadStream(url, destPath, onProgress, signal) {
+  if (signal?.aborted) throw Object.assign(new Error('aborted'), { aborted: true })
   let currentUrl = url
   for (let redirect = 0; redirect <= MAX_REDIRECTS; redirect++) {
+    if (signal?.aborted) throw Object.assign(new Error('aborted'), { aborted: true })
+    let currentReq = null
+    let onAbort = null
     const res = await new Promise((resolve, reject) => {
       const req = https.get(currentUrl, { timeout: 30000 }, resolve)
-      req.on('error', reject)
+      currentReq = req
+      onAbort = () => {
+        try { req.destroy(Object.assign(new Error('aborted'), { aborted: true })) } catch {}
+      }
+      signal?.addEventListener('abort', onAbort, { once: true })
+      req.on('error', (err) => {
+        if (signal?.aborted) {
+          reject(Object.assign(new Error('aborted'), { aborted: true }))
+        } else {
+          reject(err)
+        }
+      })
       req.on('timeout', () => {
         req.destroy()
         reject(new Error(`timeout connecting to ${currentUrl}`))
@@ -136,6 +152,7 @@ async function downloadStream(url, destPath, onProgress) {
     // 处理 redirect
     if (res.statusCode === 301 || res.statusCode === 302 || res.statusCode === 307 || res.statusCode === 308) {
       const next = res.headers.location
+      if (onAbort) signal?.removeEventListener('abort', onAbort)
       if (!next) throw new Error(`redirect without Location: ${res.statusCode}`)
       currentUrl = new URL(next, currentUrl).toString()
       res.resume() // drain
@@ -143,6 +160,7 @@ async function downloadStream(url, destPath, onProgress) {
     }
 
     if (res.statusCode !== 200) {
+      if (onAbort) signal?.removeEventListener('abort', onAbort)
       throw new Error(`HTTP ${res.statusCode} ${res.statusMessage || ''} for ${currentUrl}`)
     }
 
@@ -173,7 +191,14 @@ async function downloadStream(url, destPath, onProgress) {
       }
     })
 
-    await pipeline(res, writeStream)
+    try {
+      await pipeline(res, writeStream)
+    } catch (err) {
+      if (onAbort) signal?.removeEventListener('abort', onAbort)
+      if (signal?.aborted) throw Object.assign(new Error('aborted'), { aborted: true })
+      throw err
+    }
+    if (onAbort) signal?.removeEventListener('abort', onAbort)
     onProgress?.({ stage: 'download', percent: 100, downloaded, total, speedBytesPerSec: 0 })
     return
   }
@@ -225,12 +250,9 @@ async function flattenExtracted(stagingDir, topDir, targetDir) {
  * @param userDataPath app.getPath('userData')
  * @param onProgress(stage, info) — stage: 'check' | 'download' | 'extract' | 'verify' | 'done' | 'error'
  */
-export async function ensureBundledNode(userDataPath, onProgress) {
-  onProgress?.({ stage: 'check' })
-  const existing = await isBundledNodeReady(userDataPath)
-  if (existing.ready) {
-    onProgress?.({ stage: 'done', cached: true, version: existing.version })
-    return { ok: true, cached: true, version: existing.version, path: existing.path }
+export async function ensureBundledNode(userDataPath, onProgress, signal) {
+  const throwIfAborted = () => {
+    if (signal?.aborted) throw Object.assign(new Error('user cancelled'), { aborted: true })
   }
 
   const info = getNodeAssetInfo()
@@ -239,70 +261,93 @@ export async function ensureBundledNode(userDataPath, onProgress) {
   const stagingDir = path.join(runtimeRoot, '.node-staging')
   const archivePath = path.join(runtimeRoot, info.filename)
 
-  // 清残留
-  await fs.rm(nodeRoot, { recursive: true, force: true })
-  await fs.rm(stagingDir, { recursive: true, force: true })
-  await fs.mkdir(runtimeRoot, { recursive: true })
+  try {
+    onProgress?.({ stage: 'check' })
+    throwIfAborted()
+    const existing = await isBundledNodeReady(userDataPath)
+    if (existing.ready) {
+      onProgress?.({ stage: 'done', cached: true, version: existing.version })
+      return { ok: true, cached: true, version: existing.version, path: existing.path }
+    }
 
-  // 1) 下载（镜像优先，失败 fallback 官方）
-  const sources = [
-    { name: 'npmmirror (国内)', url: `${MIRROR_PRIMARY}/${NODE_VERSION}/${info.filename}` },
-    { name: 'nodejs.org 官方', url: `${MIRROR_OFFICIAL}/${NODE_VERSION}/${info.filename}` },
-  ]
-  let downloadOk = false
-  let lastError = null
-  for (const src of sources) {
+    // 清残留
+    await fs.rm(nodeRoot, { recursive: true, force: true })
+    await fs.rm(stagingDir, { recursive: true, force: true })
+    await fs.mkdir(runtimeRoot, { recursive: true })
+
+    // 1) 下载（镜像优先，失败 fallback 官方）
+    const sources = [
+      { name: 'npmmirror (国内)', url: `${MIRROR_PRIMARY}/${NODE_VERSION}/${info.filename}` },
+      { name: 'nodejs.org 官方', url: `${MIRROR_OFFICIAL}/${NODE_VERSION}/${info.filename}` },
+    ]
+    let downloadOk = false
+    let lastError = null
+    for (const src of sources) {
+      throwIfAborted()
+      try {
+        onProgress?.({ stage: 'download', source: src.name, url: src.url, percent: 0 })
+        await downloadStream(src.url, archivePath, (p) => onProgress?.({ ...p, source: src.name }), signal)
+        downloadOk = true
+        break
+      } catch (e) {
+        if (e?.aborted || signal?.aborted) throw Object.assign(new Error('user cancelled'), { aborted: true })
+        lastError = e
+        onProgress?.({ stage: 'download-failed', source: src.name, error: String(e?.message || e) })
+        // 删半残文件再 fallback
+        await fs.rm(archivePath, { force: true }).catch(() => {})
+      }
+    }
+    if (!downloadOk) {
+      onProgress?.({ stage: 'error', error: `所有镜像下载失败：${lastError?.message || lastError}` })
+      return { ok: false, error: 'download-failed', message: String(lastError?.message || lastError) }
+    }
+
+    // 2) 解压到 staging
+    throwIfAborted()
     try {
-      onProgress?.({ stage: 'download', source: src.name, url: src.url, percent: 0 })
-      await downloadStream(src.url, archivePath, (p) => onProgress?.({ ...p, source: src.name }))
-      downloadOk = true
-      break
+      onProgress?.({ stage: 'extract', filename: info.filename })
+      if (info.ext === 'zip') {
+        extractZip(archivePath, stagingDir)
+      } else {
+        await extractTarGz(archivePath, stagingDir)
+      }
     } catch (e) {
-      lastError = e
-      onProgress?.({ stage: 'download-failed', source: src.name, error: String(e?.message || e) })
-      // 删半残文件再 fallback
+      onProgress?.({ stage: 'error', error: `解压失败：${e?.message || e}` })
+      return { ok: false, error: 'extract-failed', message: String(e?.message || e) }
+    }
+
+    // 3) 平铺 staging/<topDir>/* → runtime/node/
+    throwIfAborted()
+    try {
+      await flattenExtracted(stagingDir, info.topDir, nodeRoot)
+    } catch (e) {
+      onProgress?.({ stage: 'error', error: `布局失败：${e?.message || e}` })
+      return { ok: false, error: 'flatten-failed', message: String(e?.message || e) }
+    }
+
+    // 4) 删 archive 释放空间
+    await fs.rm(archivePath, { force: true }).catch(() => {})
+
+    // 5) 校验 node --version 能跑
+    onProgress?.({ stage: 'verify' })
+    const verify = await isBundledNodeReady(userDataPath)
+    if (!verify.ready) {
+      onProgress?.({ stage: 'error', error: `校验失败：${verify.error || verify.reason}` })
+      return { ok: false, error: 'verify-failed', message: verify.error || verify.reason }
+    }
+
+    onProgress?.({ stage: 'done', cached: false, version: verify.version })
+    return { ok: true, cached: false, version: verify.version, path: verify.path }
+  } catch (err) {
+    if (err?.aborted) {
       await fs.rm(archivePath, { force: true }).catch(() => {})
+      await fs.rm(stagingDir, { recursive: true, force: true }).catch(() => {})
+      await fs.rm(nodeRoot, { recursive: true, force: true }).catch(() => {})
+      onProgress?.({ stage: 'error', error: '用户取消', aborted: true })
+      return { ok: false, error: 'aborted', message: '用户取消' }
     }
+    throw err
   }
-  if (!downloadOk) {
-    onProgress?.({ stage: 'error', error: `所有镜像下载失败：${lastError?.message || lastError}` })
-    return { ok: false, error: 'download-failed', message: String(lastError?.message || lastError) }
-  }
-
-  // 2) 解压到 staging
-  try {
-    onProgress?.({ stage: 'extract', filename: info.filename })
-    if (info.ext === 'zip') {
-      extractZip(archivePath, stagingDir)
-    } else {
-      await extractTarGz(archivePath, stagingDir)
-    }
-  } catch (e) {
-    onProgress?.({ stage: 'error', error: `解压失败：${e?.message || e}` })
-    return { ok: false, error: 'extract-failed', message: String(e?.message || e) }
-  }
-
-  // 3) 平铺 staging/<topDir>/* → runtime/node/
-  try {
-    await flattenExtracted(stagingDir, info.topDir, nodeRoot)
-  } catch (e) {
-    onProgress?.({ stage: 'error', error: `布局失败：${e?.message || e}` })
-    return { ok: false, error: 'flatten-failed', message: String(e?.message || e) }
-  }
-
-  // 4) 删 archive 释放空间
-  await fs.rm(archivePath, { force: true }).catch(() => {})
-
-  // 5) 校验 node --version 能跑
-  onProgress?.({ stage: 'verify' })
-  const verify = await isBundledNodeReady(userDataPath)
-  if (!verify.ready) {
-    onProgress?.({ stage: 'error', error: `校验失败：${verify.error || verify.reason}` })
-    return { ok: false, error: 'verify-failed', message: verify.error || verify.reason }
-  }
-
-  onProgress?.({ stage: 'done', cached: false, version: verify.version })
-  return { ok: true, cached: false, version: verify.version, path: verify.path }
 }
 
 /**
@@ -312,123 +357,155 @@ export async function ensureBundledNode(userDataPath, onProgress) {
  * 进度推送是 line-based（不像下载有 percent）—— npm 自己输出去 stdout，
  * 我们把最新一行 push 给前端做 hint。
  */
-export async function ensureBundledOpenClaw(userDataPath, onProgress) {
-  onProgress?.({ stage: 'check' })
-
-  // 1) 前置：node 必须 ready
-  const nodeState = await isBundledNodeReady(userDataPath)
-  if (!nodeState.ready) {
-    onProgress?.({ stage: 'error', error: 'bundled Node 未安装，请先调 ensureBundledNode' })
-    return { ok: false, error: 'node-not-ready', message: nodeState.error || nodeState.reason }
-  }
-
-  // 2) 已装 + 可跑 → cached
-  const existing = await isBundledOpenClawReady(userDataPath)
-  if (existing.ready) {
-    onProgress?.({ stage: 'done', cached: true, version: existing.version })
-    return { ok: true, cached: true, version: existing.version, path: existing.path }
-  }
-
-  // 3) 走 npm install
-  const npmBin = bundledNpmPath(userDataPath)
-  if (!existsSync(npmBin)) {
-    onProgress?.({ stage: 'error', error: 'bundled npm 不见了' })
-    return { ok: false, error: 'npm-missing' }
+export async function ensureBundledOpenClaw(userDataPath, onProgress, signal) {
+  const throwIfAborted = () => {
+    if (signal?.aborted) throw Object.assign(new Error('user cancelled'), { aborted: true })
   }
   const targetDir = path.join(bundledRuntimeRoot(userDataPath), 'openclaw')
-  // 清残留半装
-  await fs.rm(targetDir, { recursive: true, force: true })
-  await fs.mkdir(targetDir, { recursive: true })
 
-  // 镜像优先策略：先 npmmirror，失败 fallback 官方
-  const registries = [
-    { name: 'npmmirror (国内)', url: NPM_REGISTRY_PRIMARY },
-    { name: 'npmjs.org 官方', url: NPM_REGISTRY_OFFICIAL },
-  ]
+  try {
+    onProgress?.({ stage: 'check' })
+    throwIfAborted()
 
-  let installOk = false
-  let lastError = null
-  let lastLog = ''
-
-  for (const reg of registries) {
-    onProgress?.({ stage: 'install', source: reg.name, registry: reg.url, line: `开始安装 ${OPENCLAW_PACKAGE}...` })
-    try {
-      await new Promise((resolve, reject) => {
-        // 让 bundled npm 用 bundled node：把 node 目录加到 PATH 头部
-        const nodeBin = bundledNodeBinPath(userDataPath)
-        const env = {
-          ...process.env,
-          PATH: path.dirname(nodeBin) + (IS_WIN ? ';' : ':') + (process.env.PATH || ''),
-          // 防 npm fund / audit 输出污染 progress
-          NO_UPDATE_NOTIFIER: '1',
-          npm_config_fund: 'false',
-          npm_config_audit: 'false',
-        }
-        const args = [
-          'install', '-g',
-          `--prefix=${targetDir}`,
-          `--registry=${reg.url}`,
-          OPENCLAW_PACKAGE,
-        ]
-        const p = spawn(npmBin, args, { stdio: ['ignore', 'pipe', 'pipe'], env })
-
-        const pushLine = (line) => {
-          const trimmed = line.trim()
-          if (!trimmed) return
-          lastLog = trimmed
-          onProgress?.({ stage: 'install', source: reg.name, line: trimmed })
-        }
-        let stdoutBuf = ''
-        let stderrBuf = ''
-        p.stdout.on('data', (d) => {
-          stdoutBuf += d.toString()
-          let i
-          while ((i = stdoutBuf.indexOf('\n')) >= 0) {
-            pushLine(stdoutBuf.slice(0, i))
-            stdoutBuf = stdoutBuf.slice(i + 1)
-          }
-        })
-        p.stderr.on('data', (d) => {
-          stderrBuf += d.toString()
-          let i
-          while ((i = stderrBuf.indexOf('\n')) >= 0) {
-            pushLine(stderrBuf.slice(0, i))
-            stderrBuf = stderrBuf.slice(i + 1)
-          }
-        })
-        p.on('error', reject)
-        p.on('close', (code) => {
-          if (stdoutBuf) pushLine(stdoutBuf)
-          if (stderrBuf) pushLine(stderrBuf)
-          code === 0 ? resolve() : reject(new Error(`npm install exit ${code}: ${lastLog}`))
-        })
-      })
-      installOk = true
-      break
-    } catch (e) {
-      lastError = e
-      onProgress?.({ stage: 'install-failed', source: reg.name, error: String(e?.message || e) })
-      // 清残留，下一个 registry 重试
-      await fs.rm(targetDir, { recursive: true, force: true })
-      await fs.mkdir(targetDir, { recursive: true })
+    // 1) 前置：node 必须 ready
+    const nodeState = await isBundledNodeReady(userDataPath)
+    if (!nodeState.ready) {
+      onProgress?.({ stage: 'error', error: 'bundled Node 未安装，请先调 ensureBundledNode' })
+      return { ok: false, error: 'node-not-ready', message: nodeState.error || nodeState.reason }
     }
-  }
 
-  if (!installOk) {
-    onProgress?.({ stage: 'error', error: `所有 registry 安装失败: ${lastError?.message || lastError}` })
-    return { ok: false, error: 'install-failed', message: String(lastError?.message || lastError) }
-  }
+    // 2) 已装 + 可跑 → cached
+    const existing = await isBundledOpenClawReady(userDataPath)
+    if (existing.ready) {
+      onProgress?.({ stage: 'done', cached: true, version: existing.version })
+      return { ok: true, cached: true, version: existing.version, path: existing.path }
+    }
 
-  // 4) 校验
-  onProgress?.({ stage: 'verify' })
-  const verify = await isBundledOpenClawReady(userDataPath)
-  if (!verify.ready) {
-    onProgress?.({ stage: 'error', error: `校验失败：${verify.error || verify.reason}` })
-    return { ok: false, error: 'verify-failed', message: verify.error || verify.reason }
-  }
+    // 3) 走 npm install
+    const npmBin = bundledNpmPath(userDataPath)
+    if (!existsSync(npmBin)) {
+      onProgress?.({ stage: 'error', error: 'bundled npm 不见了' })
+      return { ok: false, error: 'npm-missing' }
+    }
+    // 清残留半装
+    await fs.rm(targetDir, { recursive: true, force: true })
+    await fs.mkdir(targetDir, { recursive: true })
 
-  onProgress?.({ stage: 'done', cached: false, version: verify.version })
-  return { ok: true, cached: false, version: verify.version, path: verify.path }
+    // 镜像优先策略：先 npmmirror，失败 fallback 官方
+    const registries = [
+      { name: 'npmmirror (国内)', url: NPM_REGISTRY_PRIMARY },
+      { name: 'npmjs.org 官方', url: NPM_REGISTRY_OFFICIAL },
+    ]
+
+    let installOk = false
+    let lastError = null
+    let lastLog = ''
+
+    for (const reg of registries) {
+      throwIfAborted()
+      onProgress?.({ stage: 'install', source: reg.name, registry: reg.url, line: `开始安装 ${OPENCLAW_PACKAGE}...` })
+      try {
+        await new Promise((resolve, reject) => {
+          // 让 bundled npm 用 bundled node：把 node 目录加到 PATH 头部
+          const nodeBin = bundledNodeBinPath(userDataPath)
+          const env = {
+            ...process.env,
+            PATH: path.dirname(nodeBin) + (IS_WIN ? ';' : ':') + (process.env.PATH || ''),
+            // 防 npm fund / audit 输出污染 progress
+            NO_UPDATE_NOTIFIER: '1',
+            npm_config_fund: 'false',
+            npm_config_audit: 'false',
+          }
+          const args = [
+            'install', '-g',
+            `--prefix=${targetDir}`,
+            `--registry=${reg.url}`,
+            OPENCLAW_PACKAGE,
+          ]
+          const p = spawn(npmBin, args, { stdio: ['ignore', 'pipe', 'pipe'], env })
+
+          // 用户取消时杀子进程
+          let aborted = false
+          const onAbort = () => {
+            aborted = true
+            try { p.kill('SIGTERM') } catch {}
+          }
+          signal?.addEventListener('abort', onAbort, { once: true })
+
+          const pushLine = (line) => {
+            const trimmed = line.trim()
+            if (!trimmed) return
+            lastLog = trimmed
+            onProgress?.({ stage: 'install', source: reg.name, line: trimmed })
+          }
+          let stdoutBuf = ''
+          let stderrBuf = ''
+          p.stdout.on('data', (d) => {
+            stdoutBuf += d.toString()
+            let i
+            while ((i = stdoutBuf.indexOf('\n')) >= 0) {
+              pushLine(stdoutBuf.slice(0, i))
+              stdoutBuf = stdoutBuf.slice(i + 1)
+            }
+          })
+          p.stderr.on('data', (d) => {
+            stderrBuf += d.toString()
+            let i
+            while ((i = stderrBuf.indexOf('\n')) >= 0) {
+              pushLine(stderrBuf.slice(0, i))
+              stderrBuf = stderrBuf.slice(i + 1)
+            }
+          })
+          p.on('error', (err) => {
+            signal?.removeEventListener('abort', onAbort)
+            reject(err)
+          })
+          p.on('close', (code) => {
+            signal?.removeEventListener('abort', onAbort)
+            if (stdoutBuf) pushLine(stdoutBuf)
+            if (stderrBuf) pushLine(stderrBuf)
+            if (aborted) {
+              reject(Object.assign(new Error('aborted'), { aborted: true }))
+              return
+            }
+            code === 0 ? resolve() : reject(new Error(`npm install exit ${code}: ${lastLog}`))
+          })
+        })
+        installOk = true
+        break
+      } catch (e) {
+        if (e?.aborted || signal?.aborted) throw Object.assign(new Error('user cancelled'), { aborted: true })
+        lastError = e
+        onProgress?.({ stage: 'install-failed', source: reg.name, error: String(e?.message || e) })
+        // 清残留，下一个 registry 重试
+        await fs.rm(targetDir, { recursive: true, force: true })
+        await fs.mkdir(targetDir, { recursive: true })
+      }
+    }
+
+    if (!installOk) {
+      onProgress?.({ stage: 'error', error: `所有 registry 安装失败: ${lastError?.message || lastError}` })
+      return { ok: false, error: 'install-failed', message: String(lastError?.message || lastError) }
+    }
+
+    // 4) 校验
+    onProgress?.({ stage: 'verify' })
+    const verify = await isBundledOpenClawReady(userDataPath)
+    if (!verify.ready) {
+      onProgress?.({ stage: 'error', error: `校验失败：${verify.error || verify.reason}` })
+      return { ok: false, error: 'verify-failed', message: verify.error || verify.reason }
+    }
+
+    onProgress?.({ stage: 'done', cached: false, version: verify.version })
+    return { ok: true, cached: false, version: verify.version, path: verify.path }
+  } catch (err) {
+    if (err?.aborted) {
+      await fs.rm(targetDir, { recursive: true, force: true }).catch(() => {})
+      onProgress?.({ stage: 'error', error: '用户取消', aborted: true })
+      return { ok: false, error: 'aborted', message: '用户取消' }
+    }
+    throw err
+  }
 }
 
 /**
