@@ -17,6 +17,7 @@ import { ipc } from '@/services/ipc'
 import { ClawHubSourceCard } from '@/components/settings/ClawHubSourceCard'
 import { RuntimeStatusCard } from '@/components/settings/RuntimeStatusCard'
 import { UpdateCheckCard } from '@/components/settings/UpdateCheckCard'
+import { ErrorLogCard } from '@/components/settings/ErrorLogCard'
 import {
   VerticalTabs,
   VerticalTabsList,
@@ -266,6 +267,8 @@ export function SettingsPage() {
           </Card>
 
           <UpdateCheckCard />
+
+          <ErrorLogCard />
         </div>
       </VerticalTabsContent>
     </VerticalTabs>
