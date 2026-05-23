@@ -31,7 +31,11 @@ export default function App() {
 
   // 派生：还没拉到 status 时 null（=loading），拿到后看 needsSetup
   const needsRuntimeSetup: boolean | null =
-    runtimeLoading && !runtimeStatus ? null : runtimeStatus?.needsSetup ?? false
+    runtimeLoading
+      ? null
+      : runtimeStatus
+        ? runtimeStatus.needsSetup ?? false
+        : false // 拉完了仍无 status（catch 兜底 / 非 Electron）→ 不挡用户
 
   const { authEnabled, needsLogin, checking, error, login, token, tokenVerified } = useAuth()
   const refreshLingjing = useLingjingAuthStore((s) => s.refreshSelf)
