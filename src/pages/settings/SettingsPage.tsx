@@ -16,6 +16,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { ipc } from '@/services/ipc'
 import { ClawHubSourceCard } from '@/components/settings/ClawHubSourceCard'
 import { RuntimeStatusCard } from '@/components/settings/RuntimeStatusCard'
+import { UpdateCheckCard } from '@/components/settings/UpdateCheckCard'
 import {
   VerticalTabs,
   VerticalTabsList,
@@ -263,6 +264,8 @@ export function SettingsPage() {
               </div>
             </CardContent>
           </Card>
+
+          <UpdateCheckCard />
         </div>
       </VerticalTabsContent>
     </VerticalTabs>
