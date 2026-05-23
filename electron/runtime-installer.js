@@ -430,3 +430,28 @@ export async function ensureBundledOpenClaw(userDataPath, onProgress) {
   onProgress?.({ stage: 'done', cached: false, version: verify.version })
   return { ok: true, cached: false, version: verify.version, path: verify.path }
 }
+
+/**
+ * 跑给定 node 二进制的 --version，解析成 {major, minor, patch}。
+ * 无法跑或解析失败返回 null。
+ */
+export async function probeNodeVersion(nodeBinPath) {
+  if (!existsSync(nodeBinPath)) return null
+  try {
+    const out = await new Promise((resolve, reject) => {
+      const p = spawn(nodeBinPath, ['--version'], { stdio: ['ignore', 'pipe', 'pipe'] })
+      let s = ''
+      p.stdout.on('data', (d) => (s += d.toString()))
+      p.on('close', (code) => (code === 0 ? resolve(s.trim()) : reject(new Error(`exit ${code}`))))
+      p.on('error', reject)
+    })
+    const m = out.match(/^v(\d+)\.(\d+)\.(\d+)/)
+    if (!m) return { raw: out }
+    return { raw: out, major: Number(m[1]), minor: Number(m[2]), patch: Number(m[3]) }
+  } catch {
+    return null
+  }
+}
+
+/** OpenClaw 最低 Node 大版本 */
+export const MIN_NODE_MAJOR = 22

@@ -6,7 +6,15 @@ import { promises as fs, accessSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { nodeBinCandidates, openclawBinCandidates, hermesBinCandidates, buildChildPath, IS_WIN } from './platform.js'
-import { ensureBundledNode, ensureBundledOpenClaw, isBundledNodeReady, isBundledOpenClawReady, NODE_VERSION } from './runtime-installer.js'
+import {
+  ensureBundledNode,
+  ensureBundledOpenClaw,
+  isBundledNodeReady,
+  isBundledOpenClawReady,
+  NODE_VERSION,
+  MIN_NODE_MAJOR,
+  probeNodeVersion,
+} from './runtime-installer.js'
 import {
   listChannels as channelsListCli,
   getCapabilities as channelsCapabilities,
@@ -727,30 +735,40 @@ ipcMain.handle('lingjing:runtime-status', async () => {
   const [bundledNode, bundledOpenclaw, systemNodeBin, systemOpenclawBin] = await Promise.all([
     isBundledNodeReady(userData),
     isBundledOpenClawReady(userData),
-    findNodeBin(),                  // 跨平台 candidates，含 bundled — 第一个能用的就返回
-    findOpenClawBin(),              // 同上
+    findNodeBin(),
+    findOpenClawBin(),
   ])
 
-  // 关键判断：onboarding 是否还要弹？
-  // - bundled 装好 → 不弹
-  // - 系统装了 Node v22+ 且 openclaw 也在 → 不弹（用系统的，省 800MB 磁盘）
-  // - 否则要弹
-  const hasRuntime = bundledNode.ready && bundledOpenclaw.ready
-  // 系统侧粗判：findOpenClawBin 返回非 null（可能是 bundled，也可能是 brew/winget）
-  // 并不验证 node 版本是否 v22+，因为 openclaw 自己会拒启动 — 真要拒就 onboarding 会触发
-  const systemDetected = !!systemOpenclawBin && systemOpenclawBin !== bundledOpenclaw.path
+  // 系统 node 版本探测（仅当 systemNodeBin 不是 bundled path 时探）
+  const systemNodeVersion =
+    systemNodeBin && !systemNodeBin.includes(path.join('runtime', 'node'))
+      ? await probeNodeVersion(systemNodeBin)
+      : null
+  const systemNodeMajor = systemNodeVersion?.major ?? 0
+  const systemNodeOk = systemNodeMajor >= MIN_NODE_MAJOR
+
+  const hasBundled = bundledNode.ready && bundledOpenclaw.ready
+  // 系统侧"够用"要求：openclaw 在 + node 版本足够新
+  const systemDetected =
+    !!systemOpenclawBin &&
+    systemOpenclawBin !== bundledOpenclaw.path &&
+    systemNodeOk
 
   return {
     ok: true,
     targetNodeVersion: NODE_VERSION,
+    minNodeMajor: MIN_NODE_MAJOR,
     node: bundledNode,
     openclaw: bundledOpenclaw,
     system: {
       nodePath: systemNodeBin,
+      nodeVersion: systemNodeVersion?.raw ?? null,
+      nodeMajor: systemNodeMajor || null,
+      nodeOk: systemNodeOk,
       openclawPath: systemOpenclawBin,
       detected: systemDetected,
     },
-    needsSetup: !hasRuntime && !systemDetected,
+    needsSetup: !hasBundled && !systemDetected,
     runtimeRoot: path.join(userData, 'runtime'),
   }
 })
