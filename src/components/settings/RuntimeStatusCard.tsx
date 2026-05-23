@@ -11,7 +11,14 @@ interface RuntimeState {
   loading: boolean
   node: { ready: boolean; version?: string; path?: string; reason?: string; error?: string }
   openclaw: { ready: boolean; version?: string; path?: string; reason?: string; error?: string }
-  system: { nodePath: string | null; openclawPath: string | null; detected: boolean }
+  system: {
+    nodePath: string | null
+    nodeVersion: string | null
+    nodeMajor: number | null
+    nodeOk: boolean
+    openclawPath: string | null
+    detected: boolean
+  }
   runtimeRoot: string
   diskBytes: number
 }
@@ -28,7 +35,14 @@ export function RuntimeStatusCard() {
     loading: true,
     node: { ready: false },
     openclaw: { ready: false },
-    system: { nodePath: null, openclawPath: null, detected: false },
+    system: {
+      nodePath: null,
+      nodeVersion: null,
+      nodeMajor: null,
+      nodeOk: false,
+      openclawPath: null,
+      detected: false,
+    },
     runtimeRoot: '',
     diskBytes: 0,
   })
@@ -132,6 +146,19 @@ export function RuntimeStatusCard() {
                 </div>
                 <div className="mt-0.5 font-mono opacity-75">{state.system.openclawPath}</div>
                 <div className="mt-1">无需 bundled 也能正常工作，节省 800MB 磁盘占用</div>
+              </div>
+            )}
+
+            {/* 系统有 openclaw 但 node 版本不够 */}
+            {!hasBundled && state.system.openclawPath && !state.system.nodeOk && (
+              <div className="rounded-md border border-amber-200 bg-amber-50 p-2 text-[11px] text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
+                <div className="flex items-center gap-1 font-medium">
+                  <AlertTriangle className="h-3 w-3" /> 系统 Node 版本过低
+                </div>
+                <div className="mt-0.5 font-mono opacity-75">
+                  检测到 {state.system.nodeVersion || '<unknown>'}，OpenClaw 需要 v22+
+                </div>
+                <div className="mt-1">建议走 onboarding 装 bundled Node（不会动系统的）。</div>
               </div>
             )}
 

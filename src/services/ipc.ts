@@ -132,9 +132,17 @@ export const ipc = {
       return Promise.resolve(notInElectron({
         ok: false,
         targetNodeVersion: '',
+        minNodeMajor: 22,
         node: { ready: false, reason: 'not-in-electron' as const },
         openclaw: { ready: false, reason: 'not-in-electron' as const },
-        system: { nodePath: null, openclawPath: null, detected: false },
+        system: {
+          nodePath: null,
+          nodeVersion: null,
+          nodeMajor: null,
+          nodeOk: false,
+          openclawPath: null,
+          detected: false,
+        },
         needsSetup: false, // 浏览器环境不需要 onboarding
         runtimeRoot: '',
       }))
