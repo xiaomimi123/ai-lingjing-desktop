@@ -42,8 +42,17 @@ export function isOpenclawAvailable(status: RuntimeStatus | null): boolean {
   return status.openclaw.ready || status.system.detected
 }
 
-/** Hermes 是否可用。Task 8 会精确化为 Win 平台 false。 */
+/** Hermes 是否可用。Win 平台 v1 不支持（PLAN 14 明确不迁），始终 false。 */
 export function isHermesAvailable(status: RuntimeStatus | null): boolean {
+  // Electron 下 ipc.platform 来自 preload 同步暴露的 process.platform，
+  // 浏览器/dev server 下返回 'browser'，此时按 navigator 兜底猜一次。
+  const platform = ipc.platform
+  const isWin =
+    platform === 'win32' ||
+    (platform === 'browser' &&
+      typeof navigator !== 'undefined' &&
+      /Win/i.test(navigator.platform || ''))
+  if (isWin) return false
   if (!status) return true
   return true
 }
