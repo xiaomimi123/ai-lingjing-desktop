@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useAgentStore } from '@/stores/agent-store'
 import { useProductStore, type ProductId } from '@/stores/product-store'
+import { useRuntimeStore } from '@/stores/runtime-store'
 import { useTheme } from '@/hooks/useTheme'
 
 interface ProductItem {
@@ -46,7 +47,7 @@ const BOTTOM: BottomItem[] = [
   { to: '/settings', label: '设置', icon: Settings, matchPath: '/settings' },
 ]
 
-function ProductRailItem({ item }: { item: ProductItem }) {
+function ProductRailItem({ item, available }: { item: ProductItem; available: boolean }) {
   const location = useLocation()
   const setProduct = useProductStore((s) => s.setProduct)
   const active = location.pathname.startsWith(`/${item.id}`)
@@ -54,17 +55,19 @@ function ProductRailItem({ item }: { item: ProductItem }) {
     <Tooltip>
       <TooltipTrigger asChild>
         <NavLink
-          to={item.to}
-          onClick={() => setProduct(item.id)}
+          to={available ? item.to : '/settings'}
+          onClick={() => available && setProduct(item.id)}
           className={cn(
             'group relative flex h-9 w-9 items-center justify-center rounded-md transition-colors',
             // 用 ring + 背景区分 active（img 不能像 lucide 用 currentColor）
             active
               ? 'bg-accent ring-1 ring-primary/40'
               : 'opacity-60 hover:bg-accent/60 hover:opacity-100',
+            !available && 'cursor-help grayscale opacity-40 hover:opacity-60',
           )}
-          aria-label={item.label}
+          aria-label={available ? item.label : `${item.label}（未安装，点击查看）`}
           data-testid={`product-${item.id}`}
+          data-available={available || undefined}
         >
           <img
             src={item.logoSrc}
@@ -72,10 +75,16 @@ function ProductRailItem({ item }: { item: ProductItem }) {
             className="h-6 w-6"
             draggable={false}
           />
+          {!available && (
+            <span
+              className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-amber-500 ring-2 ring-sidebar"
+              aria-hidden
+            />
+          )}
         </NavLink>
       </TooltipTrigger>
       <TooltipContent side="right" sideOffset={8} className="text-xs">
-        {item.label}
+        {available ? item.label : `${item.label} · 未安装（点击进设置）`}
       </TooltipContent>
     </Tooltip>
   )
@@ -137,9 +146,18 @@ function BottomRailItem({ item }: { item: BottomItem }) {
 
 export function Sidebar() {
   const fetchAgents = useAgentStore((s) => s.fetch)
+  const openclawAvailable = useRuntimeStore((s) => s.openclawAvailable())
+  const hermesAvailable = useRuntimeStore((s) => s.hermesAvailable())
   useEffect(() => {
     fetchAgents()
   }, [fetchAgents])
+
+  const productAvailable = (id: ProductId): boolean => {
+    if (id === 'openclaw') return openclawAvailable
+    if (id === 'hermes') return hermesAvailable
+    if (id === 'paint') return true // 走云端，不依赖 bundled runtime
+    return true
+  }
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -164,7 +182,7 @@ export function Sidebar() {
         {/* 产品入口 */}
         <nav className="flex flex-col items-center gap-1">
           {PRODUCTS.map((p) => (
-            <ProductRailItem key={p.id} item={p} />
+            <ProductRailItem key={p.id} item={p} available={productAvailable(p.id)} />
           ))}
         </nav>
 
