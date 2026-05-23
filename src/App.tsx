@@ -11,6 +11,7 @@ import { useEffect } from 'react'
 import { RouterProvider } from 'react-router-dom'
 import { useTheme } from '@/hooks/useTheme'
 import { useAuth } from '@/hooks/useAuth'
+import { useErrorLogCapture } from '@/hooks/useErrorLogCapture'
 import { useLingjingAuthStore } from '@/stores/lingjing-auth-store'
 import { useRuntimeStore } from '@/stores/runtime-store'
 import { router } from '@/router'
@@ -19,6 +20,7 @@ import { RuntimeSetupPage } from '@/pages/onboarding/RuntimeSetupPage'
 
 export default function App() {
   useTheme()
+  useErrorLogCapture()
   // Runtime gate — 首启检测 bundled / 系统 Node+OpenClaw
   // 用 store 唯一拉一次，App + Sidebar + SecondaryPanel 共享同一份 status，
   // 避免之前 App 单独 ipc.runtimeStatus() + store.refresh() 起两次 IPC。
