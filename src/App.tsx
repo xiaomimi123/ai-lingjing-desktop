@@ -12,6 +12,7 @@ import { RouterProvider } from 'react-router-dom'
 import { useTheme } from '@/hooks/useTheme'
 import { useAuth } from '@/hooks/useAuth'
 import { useLingjingAuthStore } from '@/stores/lingjing-auth-store'
+import { useRuntimeStore } from '@/stores/runtime-store'
 import { router } from '@/router'
 import { LoginGate } from '@/components/auth/LoginGate'
 import { RuntimeSetupPage } from '@/pages/onboarding/RuntimeSetupPage'
@@ -22,6 +23,12 @@ export default function App() {
   // Runtime gate — 首启检测 bundled / 系统 Node+OpenClaw
   // null 表示还在检测，true 要 onboarding，false 直接进
   const [needsRuntimeSetup, setNeedsRuntimeSetup] = useState<boolean | null>(null)
+
+  // 把 runtimeStatus 缓存到全局 store，给 Sidebar / SecondaryPanel 灰显逻辑用
+  const refreshRuntime = useRuntimeStore((s) => s.refresh)
+  useEffect(() => {
+    void refreshRuntime()
+  }, [refreshRuntime])
 
   useEffect(() => {
     let cancelled = false

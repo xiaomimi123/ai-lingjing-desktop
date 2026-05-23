@@ -21,6 +21,7 @@ import {
   type LucideIcon,
 } from '@/lib/icons'
 import { cn } from '@/lib/utils'
+import { useRuntimeStore } from '@/stores/runtime-store'
 
 interface NavItem {
   to: string
@@ -96,6 +97,8 @@ function SubNavItem({ item }: { item: NavItem }) {
 
 export function SecondaryPanel() {
   const location = useLocation()
+  const openclawAvailable = useRuntimeStore((s) => s.openclawAvailable())
+  const hermesAvailable = useRuntimeStore((s) => s.hermesAvailable())
 
   // 当前 URL 第一段决定显示哪个产品的二级菜单
   const seg = location.pathname.split('/')[1] || ''
@@ -115,6 +118,18 @@ export function SecondaryPanel() {
     return null
   }
 
+  // runtime 不可用时，把 nav 项整体置灰 + 加 '未装机' badge
+  const effectiveNav = nav.map((item) => {
+    if (item.disabled) return item
+    if (seg === 'openclaw' && !openclawAvailable) {
+      return { ...item, disabled: true, badge: '未装机' }
+    }
+    if (seg === 'hermes' && !hermesAvailable) {
+      return { ...item, disabled: true, badge: '未装机' }
+    }
+    return item
+  })
+
   return (
     <aside
       className="flex h-full w-48 flex-col border-r bg-background"
@@ -127,7 +142,7 @@ export function SecondaryPanel() {
         </div>
       </div>
       <nav className="flex flex-1 flex-col gap-0.5 overflow-auto p-2">
-        {nav.map((item) => (
+        {effectiveNav.map((item) => (
           <SubNavItem key={item.to + item.label} item={item} />
         ))}
       </nav>
