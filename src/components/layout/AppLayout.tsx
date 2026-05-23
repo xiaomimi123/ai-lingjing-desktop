@@ -9,6 +9,7 @@ import { SecondaryPanel } from './SecondaryPanel'
 import { TitleBar } from './TitleBar'
 import { StatusBar } from './StatusBar'
 import { UpdateBanner } from './UpdateBanner'
+import { BackendHealthBanner } from './BackendHealthBanner'
 import { useLingjingAuthStore } from '@/stores/lingjing-auth-store'
 import { useUpdateCheck } from '@/hooks/useUpdateCheck'
 
@@ -31,6 +32,7 @@ export function AppLayout() {
     <div className="flex h-screen flex-col bg-background">
       <TitleBar />
       <UpdateBanner />
+      <BackendHealthBanner />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar />
         <SecondaryPanel />
