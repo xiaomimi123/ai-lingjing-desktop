@@ -31,6 +31,7 @@ interface ProductItem {
 const PRODUCTS: ProductItem[] = [
   { id: 'openclaw', to: '/openclaw/chat', label: 'OpenClaw', logoSrc: '/openclaw-logo.svg' },
   { id: 'hermes', to: '/hermes/chat', label: 'Hermes', logoSrc: '/hermes-logo.svg' },
+  { id: 'paint', to: '/paint/text-to-image', label: 'AI 绘画', logoSrc: '/paint-logo.svg' },
 ]
 
 interface BottomItem {
@@ -149,10 +150,15 @@ export function Sidebar() {
         {/* Logo */}
         <Link
           to="/openclaw/chat"
-          className="mb-2 flex h-9 w-9 items-center justify-center rounded-md bg-primary text-sm font-bold text-primary-foreground"
+          className="mb-2 flex h-9 w-9 items-center justify-center overflow-hidden rounded-md"
           aria-label="灵境"
         >
-          灵
+          <img
+            src="/lingjing.svg"
+            alt="灵境"
+            className="h-full w-full"
+            draggable={false}
+          />
         </Link>
 
         {/* 产品入口 */}

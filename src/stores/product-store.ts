@@ -10,7 +10,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-export type ProductId = 'openclaw' | 'hermes'
+export type ProductId = 'openclaw' | 'hermes' | 'paint'
 
 interface State {
   /** 当前一级产品（侧栏高亮 / 路由 prefix） */
