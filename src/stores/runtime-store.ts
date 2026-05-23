@@ -4,20 +4,17 @@
 import { create } from 'zustand'
 import { ipc } from '@/services/ipc'
 
-// RuntimeStatus 类型未单独导出，从 ipc.runtimeStatus 返回值推断
-type RuntimeStatus = Awaited<ReturnType<typeof ipc.runtimeStatus>>
+// RuntimeStatus 类型未单独从 ipc 导出，这里从返回值推断后 re-export，
+// 派生函数（isOpenclawAvailable / isHermesAvailable）和组件可共用。
+export type RuntimeStatus = Awaited<ReturnType<typeof ipc.runtimeStatus>>
 
 interface State {
   status: RuntimeStatus | null
   loading: boolean
   refresh: () => Promise<void>
-  /** OpenClaw 是否可用（bundled 或系统装的）。status=null 默认 true 避免一启动就藏入口 */
-  openclawAvailable: () => boolean
-  /** Hermes：Task 8 会精确化。先用宽容默认 true。 */
-  hermesAvailable: () => boolean
 }
 
-export const useRuntimeStore = create<State>((set, get) => ({
+export const useRuntimeStore = create<State>((set) => ({
   status: null,
   loading: false,
   refresh: async () => {
@@ -33,14 +30,20 @@ export const useRuntimeStore = create<State>((set, get) => ({
       set({ loading: false })
     }
   },
-  openclawAvailable: () => {
-    const s = get().status
-    if (!s) return true
-    return s.openclaw.ready || s.system.detected
-  },
-  hermesAvailable: () => {
-    const s = get().status
-    if (!s) return true
-    return true // Task 8 会精确化为 Win 上 false
-  },
 }))
+
+// ---- 派生（纯函数，非 hook、非 selector） ----
+// 为什么不是 store 方法：避免「方法既是 action 又是 derived」的语义混乱，
+// 也方便 Task 8 加平台过滤时只动这两个函数、不动 store shape。
+
+/** OpenClaw 是否可用（bundled 或系统装的）。status=null 默认 true，避免一启动就藏入口 */
+export function isOpenclawAvailable(status: RuntimeStatus | null): boolean {
+  if (!status) return true
+  return status.openclaw.ready || status.system.detected
+}
+
+/** Hermes 是否可用。Task 8 会精确化为 Win 平台 false。 */
+export function isHermesAvailable(status: RuntimeStatus | null): boolean {
+  if (!status) return true
+  return true
+}
