@@ -35,11 +35,14 @@ const MAX_REDIRECTS = 5
  *
  * 返回 [winner, loser]：sources 数组按访问优先级顺序排好。
  */
-async function detectFastestMirror() {
+async function detectFastestMirror(signal) {
   const candidates = [
     { name: 'npmmirror (国内)', url: 'https://registry.npmmirror.com/-/binary/node/' },
     { name: 'nodejs.org 官方', url: 'https://nodejs.org/dist/' },
   ]
+  // 外部已 abort？直接降级原顺序
+  if (signal?.aborted) return candidates
+
   return new Promise((resolve) => {
     let resolved = false
     const ctrl = new AbortController()
@@ -50,6 +53,16 @@ async function detectFastestMirror() {
         resolve(candidates) // 没探测出来，保持原顺序
       }
     }, 1500)
+
+    // 外部 signal abort 时同步中止 + 早回
+    const onExternalAbort = () => {
+      if (resolved) return
+      resolved = true
+      clearTimeout(timer)
+      ctrl.abort()
+      resolve(candidates) // 降级原顺序，让外层 throwIfAborted 接住
+    }
+    signal?.addEventListener('abort', onExternalAbort, { once: true })
 
     candidates.forEach((c) => {
       let req
@@ -63,6 +76,7 @@ async function detectFastestMirror() {
             if (res.statusCode === 200 || res.statusCode === 301 || res.statusCode === 302) {
               resolved = true
               clearTimeout(timer)
+              signal?.removeEventListener('abort', onExternalAbort)
               ctrl.abort()
               const loser = candidates.find((x) => x.name !== c.name)
               resolve([c, loser])
@@ -329,7 +343,8 @@ export async function ensureBundledNode(userDataPath, onProgress, signal) {
     await fs.mkdir(runtimeRoot, { recursive: true })
 
     // 1) 下载（自动探测最快镜像，失败 fallback 另一个）
-    const ordered = await detectFastestMirror()
+    const ordered = await detectFastestMirror(signal)
+    throwIfAborted()
     const sources = ordered.map((c) => ({
       name: c.name,
       url: c.name.startsWith('npmmirror')
