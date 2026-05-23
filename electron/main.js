@@ -167,26 +167,47 @@ async function ensureHermesRunning() {
   }
 }
 
-function stopBackend() {
+// 异步：真正 await 进程 exit 后再 resolve，避免端口还被旧 backend 持着就 startBackend → EADDRINUSE。
+// SIGTERM 给 2s 优雅退出，超时 SIGKILL 兜底；总等待上限 2.5s 后强制 resolve。
+async function stopBackend() {
   if (!backendProcess) return
-  console.log('[main] 杀后端 pid=', backendProcess.pid)
-  try {
-    backendProcess.kill('SIGTERM')
-  } catch (e) {
-    console.warn('[main] 后端 SIGTERM 失败:', e.message)
-  }
-  // 兜底:2s 后还活着就 SIGKILL
-  const stale = backendProcess
-  setTimeout(() => {
-    if (stale && !stale.killed) {
-      try {
-        stale.kill('SIGKILL')
-      } catch {
-        // ignore
-      }
-    }
-  }, 2000)
+  const proc = backendProcess
   backendProcess = null
+  console.log('[main] 杀后端 pid=', proc.pid)
+
+  return new Promise((resolve) => {
+    let settled = false
+    const done = () => {
+      if (settled) return
+      settled = true
+      clearTimeout(killTimer)
+      clearTimeout(hardTimer)
+      resolve()
+    }
+
+    proc.once('exit', done)
+
+    try {
+      proc.kill('SIGTERM')
+    } catch (e) {
+      console.warn('[main] 后端 SIGTERM 失败:', e.message)
+    }
+
+    // SIGTERM 给 2s 优雅退出
+    const killTimer = setTimeout(() => {
+      if (settled) return
+      if (!proc.killed) {
+        try {
+          proc.kill('SIGKILL')
+        } catch {
+          // ignore
+        }
+      }
+    }, 2000)
+
+    // 总上限 2.5s（SIGKILL 后再给 0.5s 让 exit 事件 fire），仍未 exit 也强制 resolve
+    const hardTimer = setTimeout(done, 2500)
+  })
 }
 
 function pingTcp(host, port, { timeoutMs = 30000, intervalMs = 250 } = {}) {
@@ -734,6 +755,27 @@ ipcMain.handle('lingjing:runtime-status', async () => {
   }
 })
 
+// 防 reentrant：用户连点重试 / UI bug 并发触发 ensure-node 时，两个 handler 都进重启分支会 race。
+// 在飞期间共享同一个 Promise，确保只有一次 stop→start→ping 序列。
+let backendRestartInFlight = null
+async function restartBackendForNode() {
+  if (backendRestartInFlight) return backendRestartInFlight
+  backendRestartInFlight = (async () => {
+    console.log('[main] bundled Node 装好，重启后端使用它')
+    await stopBackend()
+    await startBackend().catch((e) =>
+      console.error('[main] 重启后端失败:', e?.message || e),
+    )
+    const ok = await pingTcp(BACKEND_HOST, BACKEND_PORT, { timeoutMs: 10000 })
+      .then(() => true)
+      .catch(() => false)
+    return ok
+  })().finally(() => {
+    backendRestartInFlight = null
+  })
+  return backendRestartInFlight
+}
+
 // 长任务：webContents.send 推 progress 给所有窗口。前端订阅 'lingjing:runtime-progress'
 ipcMain.handle('lingjing:runtime-ensure-node', async () => {
   const userData = app.getPath('userData')
@@ -745,13 +787,17 @@ ipcMain.handle('lingjing:runtime-ensure-node', async () => {
   // Node 装好（非缓存命中）→ 重启后端，让它用新 node。
   // backend 之前可能因为找不到 node 已经 crash，stopBackend 是幂等的。
   if (result.ok && !result.cached) {
-    console.log('[main] bundled Node 装好，重启后端使用它')
-    stopBackend()
-    await new Promise((r) => setTimeout(r, 500))
-    await startBackend().catch((e) =>
-      console.error('[main] 重启后端失败:', e?.message || e),
-    )
-    await pingTcp(BACKEND_HOST, BACKEND_PORT, { timeoutMs: 10000 }).catch(() => {})
+    const restarted = await restartBackendForNode()
+    if (!restarted) {
+      // 端口未就绪 → 给前端发 backend error，让 health banner / onboarding UI 兜底
+      for (const win of BrowserWindow.getAllWindows()) {
+        win.webContents.send('lingjing:runtime-progress', {
+          component: 'backend',
+          stage: 'error',
+          error: 'backend 重启后端口未就绪，请重启应用',
+        })
+      }
+    }
   }
   return result
 })
@@ -1122,4 +1168,8 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
 
-app.on('before-quit', stopBackend)
+// stopBackend 现在是 async：before-quit listener 保持同步语义，fire-and-forget。
+// app 退出流程不等 backend exit 也没关系，OS 会回收。
+app.on('before-quit', () => {
+  void stopBackend().catch((e) => console.warn('[main] stopBackend on quit:', e?.message || e))
+})
