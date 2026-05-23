@@ -185,25 +185,25 @@ export const ipc = {
 
   runtimeEnsureNode() {
     if (!window.lingjing) {
-      return Promise.resolve(notInElectron({ ok: false, error: 'not-in-electron' }))
+      return Promise.resolve(notInElectron({ ok: false, error: 'not-in-electron', message: '浏览器环境不支持' }))
     }
     return window.lingjing.runtimeEnsureNode()
   },
 
   runtimeEnsureOpenClaw() {
     if (!window.lingjing) {
-      return Promise.resolve(notInElectron({ ok: false, error: 'not-in-electron' }))
+      return Promise.resolve(notInElectron({ ok: false, error: 'not-in-electron', message: '浏览器环境不支持' }))
     }
     return window.lingjing.runtimeEnsureOpenClaw()
   },
 
   runtimeUninstall() {
-    if (!window.lingjing) return Promise.resolve(notInElectron({ ok: false }))
+    if (!window.lingjing) return Promise.resolve(notInElectron({ ok: false, message: '浏览器环境不支持' }))
     return window.lingjing.runtimeUninstall()
   },
 
   runtimeCancel() {
-    if (!window.lingjing) return Promise.resolve(notInElectron({ ok: false }))
+    if (!window.lingjing) return Promise.resolve(notInElectron({ ok: false, message: '浏览器环境不支持' }))
     return window.lingjing.runtimeCancel()
   },
 
