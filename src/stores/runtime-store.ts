@@ -16,7 +16,7 @@ interface State {
 
 export const useRuntimeStore = create<State>((set) => ({
   status: null,
-  loading: false,
+  loading: true,  // 初始就标 loading，让首帧派生出 null
   refresh: async () => {
     if (!ipc.isElectron) {
       set({ status: null, loading: false })
