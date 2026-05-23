@@ -19,6 +19,7 @@ const ENV_DEFAULTS = {
   HERMES_API_KEY: '',
   HERMES_CLI_PATH: '',
   HERMES_HOME: '',
+  LINGJING_UPDATE_MANIFEST_URL: '',
 }
 
 export function loadEnvConfig(envPath) {

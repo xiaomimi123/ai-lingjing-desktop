@@ -1,0 +1,10 @@
+{
+  "version": "1.1.0",
+  "releaseDate": "2026-05-23",
+  "notes": "新增 AI 绘画功能\n优化登录与本地鉴权\n灵境 logo 全新设计",
+  "downloads": {
+    "darwin-arm64": "https://pub-xxxxxxxx.r2.dev/lingjing-releases/灵境-1.1.0-arm64.dmg",
+    "darwin-x64":   "https://pub-xxxxxxxx.r2.dev/lingjing-releases/灵境-1.1.0-x64.dmg",
+    "win-x64":      "https://pub-xxxxxxxx.r2.dev/lingjing-releases/灵境-1.1.0.exe"
+  }
+}

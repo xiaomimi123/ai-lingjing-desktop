@@ -8,7 +8,9 @@ import { Sidebar } from './Sidebar'
 import { SecondaryPanel } from './SecondaryPanel'
 import { TitleBar } from './TitleBar'
 import { StatusBar } from './StatusBar'
+import { UpdateBanner } from './UpdateBanner'
 import { useLingjingAuthStore } from '@/stores/lingjing-auth-store'
+import { useUpdateCheck } from '@/hooks/useUpdateCheck'
 
 export function AppLayout() {
   const navigate = useNavigate()
@@ -22,9 +24,13 @@ export function AppLayout() {
     }
   }, [checking, loggedIn, location.pathname, navigate])
 
+  // 启动延迟检查更新（失败静默）
+  useUpdateCheck(true)
+
   return (
     <div className="flex h-screen flex-col bg-background">
       <TitleBar />
+      <UpdateBanner />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar />
         <SecondaryPanel />
