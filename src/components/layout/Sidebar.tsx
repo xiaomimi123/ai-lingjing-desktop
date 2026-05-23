@@ -20,7 +20,7 @@ import { useAgentStore } from '@/stores/agent-store'
 import { useProductStore, type ProductId } from '@/stores/product-store'
 import { useRuntimeStore, isOpenclawAvailable, isHermesAvailable } from '@/stores/runtime-store'
 import { useTheme } from '@/hooks/useTheme'
-import { ipc } from '@/services/ipc'
+import { isWindowsPlatform } from '@/lib/platform'
 
 interface ProductItem {
   id: ProductId
@@ -30,15 +30,15 @@ interface ProductItem {
   logoSrc: string
 }
 
-// 注意：getProducts() 在模块加载时跑一次。ipc.platform 是 preload 同步暴露的属性，
-// 模块加载时已可读，所以这种用法 OK；Win 平台直接不渲染 Hermes 入口。
+// 注意：getProducts() 在模块加载时跑一次。isWindowsPlatform() 优先读 ipc.platform
+// （preload 同步暴露），浏览器兜底走 navigator；模块加载时已可读，Win 平台直接不渲染 Hermes 入口。
 function getProducts(): ProductItem[] {
   const all: ProductItem[] = [
     { id: 'openclaw', to: '/openclaw/chat', label: 'OpenClaw', logoSrc: '/openclaw-logo.svg' },
     { id: 'hermes', to: '/hermes/chat', label: 'Hermes', logoSrc: '/hermes-logo.svg' },
     { id: 'paint', to: '/paint/text-to-image', label: 'AI 绘画', logoSrc: '/paint-logo.svg' },
   ]
-  if (ipc.platform === 'win32') {
+  if (isWindowsPlatform()) {
     return all.filter((p) => p.id !== 'hermes')
   }
   return all

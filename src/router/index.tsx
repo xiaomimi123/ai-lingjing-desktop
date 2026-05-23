@@ -24,6 +24,7 @@ import { CronPage } from '@/pages/cron/CronPage'
 import { ChannelsPage } from '@/pages/channels/ChannelsPage'
 import { PaintPage } from '@/pages/paint/PaintPage'
 import { PaintHistoryPage } from '@/pages/paint/PaintHistoryPage'
+import { isWindowsPlatform } from '@/lib/platform'
 
 export const router = createBrowserRouter([
   {
@@ -47,10 +48,13 @@ export const router = createBrowserRouter([
       { path: 'openclaw/cron', element: <CronPage /> },
       { path: 'openclaw/channels', element: <ChannelsPage /> },
 
-      // Hermes 仅对话已接（其他 redirect 回 chat）
-      { path: 'hermes', element: <Navigate to="/hermes/chat" replace /> },
-      { path: 'hermes/chat', element: <ChatPage /> },
-      { path: 'hermes/*', element: <Navigate to="/hermes/chat" replace /> },
+      // Hermes 仅对话已接（其他 redirect 回 chat）。
+      // Win 平台 v1 不支持 Hermes，三条规则全部 Navigate 到 /openclaw/chat，
+      // 保护用户直接键入 URL 或 persisted product=hermes 时不进 ChatPage 拉 Hermes。
+      // isWindowsPlatform() 在模块加载时跑一次（routerObject 构建时），运行时不变。
+      { path: 'hermes', element: isWindowsPlatform() ? <Navigate to="/openclaw/chat" replace /> : <Navigate to="/hermes/chat" replace /> },
+      { path: 'hermes/chat', element: isWindowsPlatform() ? <Navigate to="/openclaw/chat" replace /> : <ChatPage /> },
+      { path: 'hermes/*', element: isWindowsPlatform() ? <Navigate to="/openclaw/chat" replace /> : <Navigate to="/hermes/chat" replace /> },
 
       // AI 绘画
       { path: 'paint', element: <Navigate to="/paint/text-to-image" replace /> },
