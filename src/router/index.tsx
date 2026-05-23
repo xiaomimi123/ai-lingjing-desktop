@@ -18,6 +18,7 @@ import { SettingsPage } from '@/pages/settings/SettingsPage'
 import { AccountPage } from '@/pages/account/AccountPage'
 import { UsagePage } from '@/pages/account/UsagePage'
 import { OnboardingPage } from '@/pages/onboarding/OnboardingPage'
+import { WelcomePage } from '@/pages/welcome/WelcomePage'
 import { AgentList } from '@/pages/agents/AgentList'
 import { SkillsPage } from '@/pages/skills/SkillsPage'
 import { CronPage } from '@/pages/cron/CronPage'
@@ -30,6 +31,10 @@ export const router = createBrowserRouter([
   {
     path: '/onboarding',
     element: <OnboardingPage />,
+  },
+  {
+    path: '/welcome',
+    element: <WelcomePage />,
   },
   {
     path: '/',
