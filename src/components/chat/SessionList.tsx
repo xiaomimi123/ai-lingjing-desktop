@@ -350,14 +350,21 @@ function HermesSessionPanel() {
             const isLoading = s.id === loadingSessionId
             const ts = typeof s.started_at === 'number' ? s.started_at * 1000 : 0
             return (
-              <button
+              <div
                 key={s.id}
-                type="button"
+                role="button"
+                tabIndex={0}
                 onClick={() => handleSelectSession(s.id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    handleSelectSession(s.id)
+                  }
+                }}
                 data-testid="hermes-session-row"
                 data-session-id={s.id}
                 className={cn(
-                  'group flex w-full flex-col gap-0.5 rounded-md border px-2 py-1.5 text-left transition-colors',
+                  'group flex w-full cursor-pointer flex-col gap-0.5 rounded-md border px-2 py-1.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                   active
                     ? 'border-primary bg-primary/5'
                     : 'border-transparent hover:bg-accent',
@@ -392,7 +399,7 @@ function HermesSessionPanel() {
                   <span>{s.message_count ?? 0} 条 · {s.model ?? 'unknown'}</span>
                   <span>{ts ? formatRelativeTime(ts) : ''}</span>
                 </div>
-              </button>
+              </div>
             )
           })}
         </div>
