@@ -29,6 +29,57 @@ const MIRROR_PRIMARY = 'https://registry.npmmirror.com/-/binary/node'
 const MIRROR_OFFICIAL = 'https://nodejs.org/dist'
 const MAX_REDIRECTS = 5
 
+/**
+ * 探测哪个镜像更快：并行 HEAD 两个镜像根，先回的胜出。
+ * 1.5s 拍板；都没回就降级到原顺序（国内优先）。
+ *
+ * 返回 [winner, loser]：sources 数组按访问优先级顺序排好。
+ */
+async function detectFastestMirror() {
+  const candidates = [
+    { name: 'npmmirror (国内)', url: 'https://registry.npmmirror.com/-/binary/node/' },
+    { name: 'nodejs.org 官方', url: 'https://nodejs.org/dist/' },
+  ]
+  return new Promise((resolve) => {
+    let resolved = false
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => {
+      if (!resolved) {
+        resolved = true
+        ctrl.abort()
+        resolve(candidates) // 没探测出来，保持原顺序
+      }
+    }, 1500)
+
+    candidates.forEach((c) => {
+      let req
+      try {
+        req = https.request(
+          c.url,
+          { method: 'HEAD', timeout: 1400, signal: ctrl.signal },
+          (res) => {
+            if (resolved) return
+            // 200/301/302 都算"通"
+            if (res.statusCode === 200 || res.statusCode === 301 || res.statusCode === 302) {
+              resolved = true
+              clearTimeout(timer)
+              ctrl.abort()
+              const loser = candidates.find((x) => x.name !== c.name)
+              resolve([c, loser])
+            }
+            res.resume() // drain
+          },
+        )
+      } catch {
+        return
+      }
+      req.on('error', () => {})
+      req.on('timeout', () => { try { req.destroy() } catch {} })
+      req.end()
+    })
+  })
+}
+
 /** 拼出当前平台 / 架构对应的 Node 二进制文件名和扩展 */
 export function getNodeAssetInfo() {
   const arch = process.arch === 'arm64' ? 'arm64' : 'x64'
@@ -277,11 +328,14 @@ export async function ensureBundledNode(userDataPath, onProgress, signal) {
     await fs.rm(stagingDir, { recursive: true, force: true })
     await fs.mkdir(runtimeRoot, { recursive: true })
 
-    // 1) 下载（镜像优先，失败 fallback 官方）
-    const sources = [
-      { name: 'npmmirror (国内)', url: `${MIRROR_PRIMARY}/${NODE_VERSION}/${info.filename}` },
-      { name: 'nodejs.org 官方', url: `${MIRROR_OFFICIAL}/${NODE_VERSION}/${info.filename}` },
-    ]
+    // 1) 下载（自动探测最快镜像，失败 fallback 另一个）
+    const ordered = await detectFastestMirror()
+    const sources = ordered.map((c) => ({
+      name: c.name,
+      url: c.name.startsWith('npmmirror')
+        ? `${MIRROR_PRIMARY}/${NODE_VERSION}/${info.filename}`
+        : `${MIRROR_OFFICIAL}/${NODE_VERSION}/${info.filename}`,
+    }))
     let downloadOk = false
     let lastError = null
     for (const src of sources) {
