@@ -169,6 +169,11 @@ export const ipc = {
     return window.lingjing.runtimeUninstall()
   },
 
+  runtimeCancel() {
+    if (!window.lingjing) return Promise.resolve(notInElectron({ ok: false }))
+    return window.lingjing.runtimeCancel()
+  },
+
   runtimeDiskUsage() {
     if (!window.lingjing) return Promise.resolve(notInElectron({ ok: false, bytes: 0, path: '' }))
     return window.lingjing.runtimeDiskUsage()
