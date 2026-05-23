@@ -167,3 +167,40 @@ export function platformCommandHints() {
     screenshot: 'screencapture ~/Desktop/$(date +%s).png',
   }
 }
+
+/**
+ * IPC 友好版本：示例命令字符串（函数 hint 替换为带 {占位符} 的模板）。
+ * 前端 / SOUL 渲染拿到后可以替换 {url} {app} {dir} {name} 占位符，
+ * 或直接展示给用户作为参考。
+ *
+ * 跟 platformCommandHints() 区别：返回纯字符串对象，JSON.stringify 安全，
+ * 可以走 IPC / SSE / 持久化。
+ */
+export function platformCommandHintsSerializable() {
+  if (IS_WIN) {
+    return {
+      platform: 'win32',
+      shell: 'PowerShell / cmd',
+      examples: {
+        openUrl: 'start "" "{url}"',
+        openApp: 'start "" "{app}"',
+        listFiles: 'dir "{dir}"',
+        screenshot: 'powershell -c "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait(\\"^{PRTSC}\\")"',
+        killByName: 'taskkill /IM "{name}" /F',
+        showProcess: 'tasklist | findstr',
+      },
+    }
+  }
+  return {
+    platform: process.platform,
+    shell: 'Terminal',
+    examples: {
+      openUrl: 'open "{url}"',
+      openApp: 'open -a "{app}"',
+      listFiles: 'ls "{dir}"',
+      screenshot: 'screencapture ~/Desktop/$(date +%s).png',
+      killByName: 'pkill -x "{name}"',
+      showProcess: 'top -l 1 -n 5',
+    },
+  }
+}

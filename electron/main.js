@@ -5,7 +5,7 @@ import os from 'node:os'
 import { promises as fs, accessSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import { nodeBinCandidates, openclawBinCandidates, hermesBinCandidates, buildChildPath, IS_WIN } from './platform.js'
+import { nodeBinCandidates, openclawBinCandidates, hermesBinCandidates, buildChildPath, platformCommandHintsSerializable, IS_WIN } from './platform.js'
 import {
   ensureBundledNode,
   ensureBundledOpenClaw,
@@ -1004,6 +1004,14 @@ ipcMain.handle('lingjing:open-external', async (_event, url) => {
   if (!/^https?:\/\//i.test(url)) return { ok: false, message: 'unsupported scheme' }
   await shell.openExternal(url)
   return { ok: true }
+})
+
+// 给 SOUL 渲染 / Agent prompt 用：当前平台的 shell 命令示例。
+// 灵境主理人 SOUL 模板默认 mac 命令（open / pbcopy / screencapture），
+// Win 用户让 Agent 执行会失败 → 前端拿到这个 hint 后可以注入到 prompt
+// 或在 UI 上展示对应平台等价命令。
+ipcMain.handle('lingjing:platform-hints', async () => {
+  return platformCommandHintsSerializable()
 })
 
 // 系统原生文件选择器。任务执行页填路径参数时弹出

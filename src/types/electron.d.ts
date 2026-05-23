@@ -94,6 +94,18 @@ export interface LingjingPreload {
   getGatewayStatus(): Promise<GatewayStatus>
   restartGateway(which: 'openclaw' | 'hermes'): Promise<RestartGatewayResult>
   openExternal(url: string): Promise<{ ok: boolean; message?: string }>
+  platformHints(): Promise<{
+    platform: string
+    shell: string
+    examples: {
+      openUrl: string
+      openApp: string
+      listFiles: string
+      screenshot: string
+      killByName: string
+      showProcess: string
+    }
+  }>
   skillsSearch(params?: SkillsSearchParams): Promise<{ ok: boolean; results?: unknown[]; message?: string; clawhubUrl?: string }>
   skillsInstall(params: SkillsInstallParams): Promise<{ ok: boolean; stdout?: string; message?: string }>
   skillsUninstall(params: { slug: string; force?: boolean }): Promise<{ ok: boolean; stdout?: string; message?: string }>

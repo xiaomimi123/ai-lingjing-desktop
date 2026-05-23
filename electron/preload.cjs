@@ -43,6 +43,11 @@ contextBridge.exposeInMainWorld('lingjing', {
    */
   openExternal: (url) => ipcRenderer.invoke('lingjing:open-external', url),
   /**
+   * 拿当前平台的 shell 命令示例（SOUL 渲染 / Agent prompt 用）。
+   * mac 上返回 open/ls/screencapture，Win 上返回 start/dir/PowerShell 等价。
+   */
+  platformHints: () => ipcRenderer.invoke('lingjing:platform-hints'),
+  /**
    * ClawHub 技能商城 —— 走 openclaw skills CLI 调用,Electron 主进程出锅。
    */
   skillsSearch: (params) => ipcRenderer.invoke('lingjing:skills-search', params),
