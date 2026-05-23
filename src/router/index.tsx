@@ -22,6 +22,8 @@ import { AgentList } from '@/pages/agents/AgentList'
 import { SkillsPage } from '@/pages/skills/SkillsPage'
 import { CronPage } from '@/pages/cron/CronPage'
 import { ChannelsPage } from '@/pages/channels/ChannelsPage'
+import { PaintPage } from '@/pages/paint/PaintPage'
+import { PaintHistoryPage } from '@/pages/paint/PaintHistoryPage'
 
 export const router = createBrowserRouter([
   {
@@ -49,6 +51,11 @@ export const router = createBrowserRouter([
       { path: 'hermes', element: <Navigate to="/hermes/chat" replace /> },
       { path: 'hermes/chat', element: <ChatPage /> },
       { path: 'hermes/*', element: <Navigate to="/hermes/chat" replace /> },
+
+      // AI 绘画
+      { path: 'paint', element: <Navigate to="/paint/text-to-image" replace /> },
+      { path: 'paint/text-to-image', element: <PaintPage /> },
+      { path: 'paint/history', element: <PaintHistoryPage /> },
 
       // 顶级共享
       { path: 'account', element: <AccountPage /> },

@@ -16,6 +16,8 @@ import {
   Database,
   Brain,
   Sparkles,
+  MagicWand,
+  Inbox,
   type LucideIcon,
 } from '@/lib/icons'
 import { cn } from '@/lib/utils'
@@ -45,6 +47,11 @@ const HERMES_NAV: NavItem[] = [
   { to: '/hermes/skills', label: 'Skills', icon: Package, badge: 'v1.2', disabled: true },
   { to: '/hermes/cron', label: 'Cron', icon: AlarmClock, badge: 'v1.2', disabled: true },
   { to: '/hermes/mcp', label: 'MCP', icon: Database, badge: 'v1.2', disabled: true },
+]
+
+const PAINT_NAV: NavItem[] = [
+  { to: '/paint/text-to-image', label: '文生图', icon: MagicWand },
+  { to: '/paint/history', label: '历史', icon: Inbox },
 ]
 
 function SubNavItem({ item }: { item: NavItem }) {
@@ -100,6 +107,9 @@ export function SecondaryPanel() {
   } else if (seg === 'hermes') {
     nav = HERMES_NAV
     productLabel = 'Hermes'
+  } else if (seg === 'paint') {
+    nav = PAINT_NAV
+    productLabel = 'AI 绘画'
   } else {
     // /account /settings 等顶级页面 → 不显示 panel
     return null
